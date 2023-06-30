@@ -1078,6 +1078,10 @@ int main( int argc, char* argv[] )
      */
 
 		if ( audioEssence->is_embedded ) {
+      if ( media_cache_path.empty() ) {
+        PRINT_E( "Could not extract audio file from AAF : media cache was not set.\n" );
+        continue;
+      }
       if ( aafi_extract_audio_essence( aafi, audioEssence, media_cache_path.c_str(), NULL, 0 ) < 0 ) {
         PRINT_E( "Could not extract audio file '%ls' from AAF.\n", audioEssence->unique_file_name );
         continue; // TODO or fail ?
