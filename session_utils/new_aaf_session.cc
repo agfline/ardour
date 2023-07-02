@@ -644,7 +644,7 @@ static void set_session_video_from_aaf( Session *s, AAF_Iface *aafi )
 static void set_session_fps_from_aaf( Session *s, AAF_Iface *aafi )
 {
   uint16_t aaftc2 = aafi->Audio->tc->fps;
-  aafRational_t *aaftc1 = ( aafi->Video ) ? ( aafi->Video->Essences ) ? aafi->Video->Essences->framerate : NULL : NULL;
+  // aafRational_t *aaftc1 = ( aafi->Video ) ? ( aafi->Video->Essences ) ? aafi->Video->Essences->framerate : NULL : NULL;
   TimecodeFormat ardourtc;
 
   /*
@@ -664,56 +664,61 @@ static void set_session_fps_from_aaf( Session *s, AAF_Iface *aafi )
    *    	REGISTER_ENUM (timecode_30drop);
    *    	REGISTER_ENUM (timecode_5994);
    *   	  REGISTER_ENUM (timecode_60);
+   *
+   *
+   *  TODO: Why should we set TC based on aafi->Video->Essences->framerate ?
+   *  Disable until we found a good reason.
    */
-  if ( aaftc1 ) {
 
-    if ( aaftc1->numerator   == 24000 &&
-         aaftc1->denominator ==  1001 )
-    {
-      ardourtc = timecode_23976;
-    }
-    else
-    if ( aaftc1->numerator   == 24 &&
-         aaftc1->denominator ==  1 )
-    {
-      ardourtc = timecode_24;
-    }
-    else
-    if ( aaftc1->numerator   == 25 &&
-         aaftc1->denominator ==  1 )
-    {
-      ardourtc = timecode_25;
-    }
-    else
-    if ( aaftc1->numerator   == 29000 &&
-         aaftc1->denominator ==  1001 )
-    {
-      ardourtc = timecode_2997;
-    }
-    else
-    if ( aaftc1->numerator   == 30 &&
-         aaftc1->denominator ==  1 )
-    {
-      ardourtc = timecode_30;
-    }
-    else
-    if ( aaftc1->numerator   == 59000 &&
-         aaftc1->denominator ==  1001 )
-    {
-      ardourtc = timecode_5994;
-    }
-    else
-    if ( aaftc1->numerator   == 60 &&
-         aaftc1->denominator ==  1 )
-    {
-      ardourtc = timecode_60;
-    }
-    else {
-      PRINT_E( "Unknown AAF timecode fps : %i/%i.\n", aaftc1->numerator, aaftc1->denominator );
-      return;
-    }
-  }
-  else {
+  // if ( aaftc1 ) {
+  //
+  //   if ( aaftc1->numerator   == 24000 &&
+  //        aaftc1->denominator ==  1001 )
+  //   {
+  //     ardourtc = timecode_23976;
+  //   }
+  //   else
+  //   if ( aaftc1->numerator   == 24 &&
+  //        aaftc1->denominator ==  1 )
+  //   {
+  //     ardourtc = timecode_24;
+  //   }
+  //   else
+  //   if ( aaftc1->numerator   == 25 &&
+  //        aaftc1->denominator ==  1 )
+  //   {
+  //     ardourtc = timecode_25;
+  //   }
+  //   else
+  //   if ( aaftc1->numerator   == 29000 &&
+  //        aaftc1->denominator ==  1001 )
+  //   {
+  //     ardourtc = timecode_2997;
+  //   }
+  //   else
+  //   if ( aaftc1->numerator   == 30 &&
+  //        aaftc1->denominator ==  1 )
+  //   {
+  //     ardourtc = timecode_30;
+  //   }
+  //   else
+  //   if ( aaftc1->numerator   == 59000 &&
+  //        aaftc1->denominator ==  1001 )
+  //   {
+  //     ardourtc = timecode_5994;
+  //   }
+  //   else
+  //   if ( aaftc1->numerator   == 60 &&
+  //        aaftc1->denominator ==  1 )
+  //   {
+  //     ardourtc = timecode_60;
+  //   }
+  //   else {
+  //     PRINT_E( "Unknown AAF timecode fps : %i/%i.\n", aaftc1->numerator, aaftc1->denominator );
+  //     return;
+  //   }
+  // }
+  // else {
 
     switch ( aaftc2 ) {
 
@@ -769,7 +774,7 @@ static void set_session_fps_from_aaf( Session *s, AAF_Iface *aafi )
         PRINT_E( "Unknown AAF timecode fps : %i.\n", aaftc2 );
         return;
     }
-  }
+  // }
 
   s->config.set_timecode_format( ardourtc );
 }
