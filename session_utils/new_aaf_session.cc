@@ -547,97 +547,97 @@ static void set_region_fade_from_aaf_audioclip( aafiAudioClip *audioClip, std::s
 
 
 
-static void set_session_video_from_aaf( Session *s, AAF_Iface *aafi )
-{
-  if ( aafi->Video->Tracks && aafi->Video->Tracks->Items ) {
-
-		aafiVideoClip *videoClip = (aafiVideoClip*)&aafi->Video->Tracks->Items->data;
-
-		// printf( "\n\n\nGot video Track and Item : %ls\n\n\n", videoClip->Essence->original_file_path/*->Essence->original_file_path*/ );
-    // char origf[PATH_MAX+1];
-    // snprintf(origf, PATH_MAX, "%ls", videoClip->Essence->original_file_path ); // TODOPATH
-    // printf("Looking for : %s\n", strrchr(origf, '/') + 1 );
-
-		char *file = locate_external_essence_file( aafi, videoClip->Essence->original_file_path, NULL );
-
-		if ( file != NULL ) {
-      PRINT_I( "Importing video : %s\n", Glib::path_get_basename(string(file)).c_str()/*fop_get_filename(file)*/ );
-
-			/* get absolute video file path */
-			std::string absFile (PBD::canonical_path (file));
-
-			// /* get original mxf video filename */
-			// char *file_name = remove_file_ext( basename(file), '.', '/' );
-			//
-			// /* creates project video folder */
-			// mkdir( s->session_directory().video_path().c_str(), 0755 );
-			//
-			// /* extract mpeg video from original mxf */
-			// char cmdstr[PATH_MAX*6];
-			// snprintf( cmdstr, sizeof(cmdstr), "ffmpeg -y -i \"%s\" -c copy -f mpeg2video \"%s/%s.mpg\"", absFile, s->session_directory().video_path().c_str(), file_name );
-			// //snprintf( cmdstr, sizeof(cmdstr), "ffmpeg -y -i \"%s\" -c copy -map_metadata 0 \"%s/%s.mkv\"", absFile, s->session_directory().video_path().c_str(), file_name );
-			//
-			// system(cmdstr);
-
-
-			/* Add video to Ardour
-			 * ===================
-			 * https://github.com/Ardour/ardour/blob/6987196ea18cbf171e22ed62760962576ccb54da/gtk2_ardour/ardour_ui_video.cc#L317
-			 *
-			 *	<Videotimeline Filename="/home/agfline/Developpement/ardio/watchfolder/3572607_RUGBY_F2_S65CFA3D0V.mxf" AutoFPS="1" LocalFile="1" OriginalVideoFile="/home/agfline/Developpement/ardio/watchfolder/3572607_RUGBY_F2_S65CFA3D0V.mxf"/>
-            <RulerVisibility timecode="1" bbt="1" samples="0" minsec="0" tempo="1" meter="1" marker="1" rangemarker="1" transportmarker="1" cdmarker="1" videotl="1"/>
-			 */
-
-			XMLNode* videoTLnode = new XMLNode( "Videotimeline" );
-			videoTLnode->set_property( "Filename", absFile/*string(file_name) + ".mpg"*/ );
-			videoTLnode->set_property( "AutoFPS", true );
-			videoTLnode->set_property( "LocalFile", true );
-			videoTLnode->set_property( "OriginalVideoFile", string(absFile) );
-			videoTLnode->set_property( "id", 51 );
-			videoTLnode->set_property( "Height", 3 );
-			videoTLnode->set_property( "VideoOffsetLock", true );
-			videoTLnode->set_property( "VideoOffset", eu2sample( s->sample_rate(), videoClip->track->Video->tc->edit_rate, (videoClip->pos + videoClip->track->Video->tc->start)) );
-
-      // printf("\n\n\n%li  |  %li\n\n\n", videoClip->pos, videoClip->track->Video->tc->start );
-
-			XMLNode* videoMONnode = new XMLNode( "Videomonitor" );
-			videoMONnode->set_property( "active", true );
-
-
-
-			XMLNode* xjnode = new XMLNode( "XJSettings" );
-
-      XMLNode* xjsetting;
-      xjsetting = xjnode->add_child( "XJSetting" );
-      xjsetting->set_property( "k", "set offset" );
-      xjsetting->set_property( "v", "-90000" ); //videoClip->pos * videoClip->track->Video->tc->edit_rate );
-
-      xjsetting = xjnode->add_child( "XJSetting" );
-      xjsetting->set_property( "k", "osd smpte" );
-      xjsetting->set_property( "v", "95" );
-
-      /* video_monitor.cc
-      <XJSettings>
-        <XJSetting k="window fullscreen" v="on"/>
-        <XJSetting k="set offset" v="-90000"/>
-        <XJSetting k="osd smpte" v="95"/>
-      </XJSettings>
-      */
-
-			s->add_extra_xml(*xjnode);
-			s->add_extra_xml(*videoTLnode);
-			s->add_extra_xml(*videoMONnode);
-
-			// s->set_dirty();
-		}
-    else {
-      PRINT_E( "Could not locate video file : %ls\n", videoClip->Essence->original_file_path );
-    }
-	}
-  else {
-    PRINT_E( "Could not retrieve video from AAF.\n" );
-  }
-}
+// static void set_session_video_from_aaf( Session *s, AAF_Iface *aafi )
+// {
+//   if ( aafi->Video->Tracks && aafi->Video->Tracks->Items ) {
+//
+// 		aafiVideoClip *videoClip = (aafiVideoClip*)&aafi->Video->Tracks->Items->data;
+//
+// 		// printf( "\n\n\nGot video Track and Item : %ls\n\n\n", videoClip->Essence->original_file_path/*->Essence->original_file_path*/ );
+//     // char origf[PATH_MAX+1];
+//     // snprintf(origf, PATH_MAX, "%ls", videoClip->Essence->original_file_path ); // TODOPATH
+//     // printf("Looking for : %s\n", strrchr(origf, '/') + 1 );
+//
+// 		char *file = locate_external_essence_file( aafi, videoClip->Essence->original_file_path, NULL );
+//
+// 		if ( file != NULL ) {
+//       PRINT_I( "Importing video : %s\n", Glib::path_get_basename(string(file)).c_str()/*fop_get_filename(file)*/ );
+//
+// 			/* get absolute video file path */
+// 			std::string absFile (PBD::canonical_path (file));
+//
+// 			// /* get original mxf video filename */
+// 			// char *file_name = remove_file_ext( basename(file), '.', '/' );
+// 			//
+// 			// /* creates project video folder */
+// 			// mkdir( s->session_directory().video_path().c_str(), 0755 );
+// 			//
+// 			// /* extract mpeg video from original mxf */
+// 			// char cmdstr[PATH_MAX*6];
+// 			// snprintf( cmdstr, sizeof(cmdstr), "ffmpeg -y -i \"%s\" -c copy -f mpeg2video \"%s/%s.mpg\"", absFile, s->session_directory().video_path().c_str(), file_name );
+// 			// //snprintf( cmdstr, sizeof(cmdstr), "ffmpeg -y -i \"%s\" -c copy -map_metadata 0 \"%s/%s.mkv\"", absFile, s->session_directory().video_path().c_str(), file_name );
+// 			//
+// 			// system(cmdstr);
+//
+//
+// 			/* Add video to Ardour
+// 			 * ===================
+// 			 * https://github.com/Ardour/ardour/blob/6987196ea18cbf171e22ed62760962576ccb54da/gtk2_ardour/ardour_ui_video.cc#L317
+// 			 *
+// 			 *	<Videotimeline Filename="/home/agfline/Developpement/ardio/watchfolder/3572607_RUGBY_F2_S65CFA3D0V.mxf" AutoFPS="1" LocalFile="1" OriginalVideoFile="/home/agfline/Developpement/ardio/watchfolder/3572607_RUGBY_F2_S65CFA3D0V.mxf"/>
+//             <RulerVisibility timecode="1" bbt="1" samples="0" minsec="0" tempo="1" meter="1" marker="1" rangemarker="1" transportmarker="1" cdmarker="1" videotl="1"/>
+// 			 */
+//
+// 			XMLNode* videoTLnode = new XMLNode( "Videotimeline" );
+// 			videoTLnode->set_property( "Filename", absFile/*string(file_name) + ".mpg"*/ );
+// 			videoTLnode->set_property( "AutoFPS", true );
+// 			videoTLnode->set_property( "LocalFile", true );
+// 			videoTLnode->set_property( "OriginalVideoFile", string(absFile) );
+// 			videoTLnode->set_property( "id", 51 );
+// 			videoTLnode->set_property( "Height", 3 );
+// 			videoTLnode->set_property( "VideoOffsetLock", true );
+// 			videoTLnode->set_property( "VideoOffset", eu2sample( s->sample_rate(), videoClip->track->Video->tc->edit_rate, (videoClip->pos + videoClip->track->Video->tc->start)) );
+//
+//       // printf("\n\n\n%li  |  %li\n\n\n", videoClip->pos, videoClip->track->Video->tc->start );
+//
+// 			XMLNode* videoMONnode = new XMLNode( "Videomonitor" );
+// 			videoMONnode->set_property( "active", true );
+//
+//
+//
+// 			XMLNode* xjnode = new XMLNode( "XJSettings" );
+//
+//       XMLNode* xjsetting;
+//       xjsetting = xjnode->add_child( "XJSetting" );
+//       xjsetting->set_property( "k", "set offset" );
+//       xjsetting->set_property( "v", "-90000" ); //videoClip->pos * videoClip->track->Video->tc->edit_rate );
+//
+//       xjsetting = xjnode->add_child( "XJSetting" );
+//       xjsetting->set_property( "k", "osd smpte" );
+//       xjsetting->set_property( "v", "95" );
+//
+//       /* video_monitor.cc
+//       <XJSettings>
+//         <XJSetting k="window fullscreen" v="on"/>
+//         <XJSetting k="set offset" v="-90000"/>
+//         <XJSetting k="osd smpte" v="95"/>
+//       </XJSettings>
+//       */
+//
+// 			s->add_extra_xml(*xjnode);
+// 			s->add_extra_xml(*videoTLnode);
+// 			s->add_extra_xml(*videoMONnode);
+//
+// 			// s->set_dirty();
+// 		}
+//     else {
+//       PRINT_E( "Could not locate video file : %ls\n", videoClip->Essence->original_file_path );
+//     }
+// 	}
+//   else {
+//     PRINT_E( "Could not retrieve video from AAF.\n" );
+//   }
+// }
 
 
 
@@ -1221,9 +1221,10 @@ int main( int argc, char* argv[] )
 
   /*
    *  Import Video from AAF
+   *  SegFault !
    */
 
-	set_session_video_from_aaf( s, aafi );
+	// set_session_video_from_aaf( s, aafi );
 
 
 
