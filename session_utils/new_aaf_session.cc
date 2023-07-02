@@ -734,7 +734,14 @@ static void set_session_fps_from_aaf( Session *s, AAF_Iface *aafi )
         break;
 
       case 25:
-        ardourtc = timecode_25;
+        if ( aafi->Audio->tc->edit_rate->numerator   == 25000 &&
+             aafi->Audio->tc->edit_rate->denominator == 1001 )
+        {
+          ardourtc = timecode_24976;
+        }
+        else {
+          ardourtc = timecode_25;
+        }
         break;
 
       case 30:
