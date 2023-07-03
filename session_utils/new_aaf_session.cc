@@ -463,17 +463,22 @@ static void put_region_on_track_from_aaf_audioclip( aafiAudioClip *audioClip, st
    * https://github.com/Ardour/ardour/blob/365f6d633731229e7bc5d37a5fe2c9107b527e28/libs/ardour/import_pt.cc#L327
    */
 
-  std::shared_ptr<AudioTrack> track;
+  aafiAudioTrack *aafTrack = audioClip->track;
 
   /* Use existing track if possible */
-  track = get_nth_audio_track( (audioClip->track->number-1), s->get_routes() );
+  std::shared_ptr<AudioTrack> track = get_nth_audio_track( (aafTrack->number-1), s->get_routes() );
 
   /* Or create a new track if needed */
   if ( !track ) {
 
-    PRINT_I( "Track number %i does not exist. Adding new track.\n", audioClip->track->number );
+    wstring ws_track_name = std::wstring( aafTrack->name );
+    string track_name = string(ws_track_name.begin(), ws_track_name.end());
 
-    list<std::shared_ptr<AudioTrack> > at( s->new_audio_track( 1, 2, 0, 1, "", PresentationInfo::max_order, Normal ) );
+    PRINT_I( "Track number %i (%s) does not exist. Adding new track.\n", aafTrack->number, track_name.c_str() );
+
+    // TODO: second argument is "output_channels". How should it be set ?
+    list<std::shared_ptr<AudioTrack> > at( s->new_audio_track( aafTrack->format, 2, 0, 1, track_name, PresentationInfo::max_order, Normal ) );
+
     if ( at.empty() ) {
       PRINT_E( "Could not create new audio track.\n" );
       ::exit( EXIT_FAILURE );
