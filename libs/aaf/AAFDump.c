@@ -23,6 +23,7 @@
 
 #include "aaf/AAFTypes.h"
 #include "aaf/AAFToText.h"
+#include "aaf/AAFDump.h"
 
 #include "aaf/utils.h"
 
