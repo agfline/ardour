@@ -22,6 +22,7 @@
 #include <cstdlib>
 #include <getopt.h>
 #include <iostream>
+#include <glibmm.h>
 
 #include <libxml/tree.h>
 #include <libxml/parser.h>
@@ -41,36 +42,38 @@
 #include "ardour/audiofilesource.h"
 #include "ardour/audio_track.h"
 
-#include "pbd/file_utils.h" // PBD::copy_file()
-
-#include "aaf/libaaf.h"
-
-#include <glibmm.h>
-
-
+#include "pbd/file_utils.h"
 #include "common.h"
 
-
-#include <ardour/sndfilesource.h> // SF_FORMAT_WAV & SF_FORMAT_PCM_24, TODO : remove once we change aafi_extract_audio_essence()
-
-
+#include "aaf/libaaf.h"
 
 
 using namespace std;
 using namespace ARDOUR;
 using namespace SessionUtils;
-
 using namespace Timecode;
-
 using namespace PBD;
-
-
 
 
 #ifndef UTILNAME
 #define UTILNAME "ardour_aafimport"
 #endif
 
+
+/*
+ *  TODO:
+ *    - Track level
+ *    - Track pan
+ *    - Track level automation
+ *    - Track pan automation
+ *    - Region level automation ?
+ *    - Session timecode offset (so the very begining of the timeline starts at eg. 01:00:00:00)
+ *    - Markers
+ *    - Multichannel audio file import
+ *    - Multichannel region from multiple source audio files (1 file per channel) ?
+ *    - Mono region from a specific channel of a multichannel file ?
+ *    - Muted region
+ */
 
 
 #define PRINT_I( fmt, ... ) \
@@ -79,9 +82,6 @@ using namespace PBD;
     { fprintf( stderr, "[\x1B[33mw\x1B[0m] \x1b[38;5;239m%s : %s() on line %i :\x1B[0m ", __FILE__, __func__, __LINE__ ); fprintf( stderr, fmt, ##__VA_ARGS__ ); }
 #define PRINT_E( fmt, ... ) \
     { fprintf( stderr, "[\x1B[31me\x1B[0m] \x1b[38;5;239m%s : %s() on line %i :\x1B[0m ", __FILE__, __func__, __LINE__ ); fprintf( stderr, fmt, ##__VA_ARGS__ ); }
-
-
-
 
 
 
@@ -237,331 +237,6 @@ static Session* create_new_session( string const &dir, string const &state, floa
 
 
 
-/*
- * libs/ardour/import.cc
- * - Reimplement since function was removed in 4620d13 : https://github.com/Ardour/ardour/commit/4620d138eefad57bc55e1901d8410c36803ce0d6 -
- */
-
-static std::shared_ptr<AudioTrack> get_nth_audio_track( uint32_t nth, std::shared_ptr<RouteList const> routes )
-{
-	RouteList rl = *(routes);//(*(routes.reader ()));
-	rl.sort( Stripable::Sorter() );
-
-	for ( auto const& r: rl ) {
-		std::shared_ptr<AudioTrack> at = std::dynamic_pointer_cast<AudioTrack> (r);
-		if ( !at ) {
-			continue;
-		}
-		if ( nth-- == 0 ) {
-			return at;
-		}
-	}
-	return std::shared_ptr<AudioTrack> ();
-}
-
-
-
-static bool import_sndfile_as_region( Session *s, struct aafiAudioEssence *audioEssence, SrcQuality quality, timepos_t &pos, SourceList &sources, ImportStatus &status, vector<std::shared_ptr<Region> > *regions /* boost::shared_ptr<Region> r*/ )
-{
-  /* https://github.com/Ardour/ardour/blob/365f6d633731229e7bc5d37a5fe2c9107b527e28/libs/ardour/import_pt.cc#L82 */
-
-  wstring ws(audioEssence->usable_file_path);
-  string usable_file_path(ws.begin(), ws.end());
-
-	/* Import the source */
-	status.paths.clear();
-	status.paths.push_back( usable_file_path /*path*/);
-	status.current = 1; // TODO
-	status.total = 1; // TODO
-	status.freeze = false;
-	status.quality = quality;
-	status.replace_existing_source = false;
-	status.split_midi_channels = false;
-  status.import_markers = false;
-	status.done = false;
-	status.cancel = false;
-
-	s->import_files( status );
-
-  status.progress = 1.0;
-	sources.clear();
-
-	/* FIXME: There is no way to tell if cancel button was pressed
-	 * or if the file failed to import, just that one of these occurred.
-	 * We want status.cancel to reflect the user's choice only
-	 */
-	if ( status.cancel && status.current > 1 )
-	{
-		/* Succeeded to import file, assume user hit cancel */
-		return false;
-	}
-	else if ( status.cancel && status.current == 1 )
-	{
-		/* Failed to import file, assume user did not hit cancel */
-		status.cancel = false;
-		return false;
-	}
-
-
-	sources.push_back( status.sources.front() );
-
-  /* save ardour sourceID for later */
-  snprintf( audioEssence->ardour_src_id, 32, "%s", sources.back()->id().to_s().c_str() );
-
-
-	/* build peakfiles */
-  for ( SourceList::iterator x = sources.begin(); x != sources.end(); ++x )
-	{
-		SourceFactory::setup_peakfile( *x, true );
-	}
-
-
-
-  // return true;
-
-
-
-  /* NOTE The following is required for the source to appear in source list */
-
-	/* Put the source on a region */
-	// vector<std::shared_ptr<Region> > regions;
-  std::shared_ptr<Region> region;
-	string region_name;
-
-
-	// /* take all the sources we have and package them up as a region */
-	//
-	// region_name = region_name_from_path (status.paths.front(), (sources.size() > 1), false);
-	//
-	// /* we checked in import_sndfiles() that there were not too many */
-	//
-	// while (RegionFactory::region_by_name (region_name)) {
-	// 	region_name = bump_name_once (region_name, '.');
-	// }
-
-  ws = audioEssence->unique_file_name;
-  string unique_file_name( ws.begin(), ws.end() );
-
-	PropertyList proplist;
-
-	proplist.add (ARDOUR::Properties::start,  0 /*eu2sample_fromclip( clip, clip->essence_offset )*/);
-	// proplist.add (ARDOUR::Properties::length, /*audioEssence->*/  /*eu2sample_fromclip( clip, clip->len )*/ sources[0]->length (pos));
-  proplist.add (ARDOUR::Properties::length, timecnt_t( sources[0]->length(), pos ));
-  // plist.add (ARDOUR::Properties::position, eu2sample_fromclip( aafAudioClip, (aafAudioClip->pos  + aafAudioClip->track->Audio->tc->start) ) );
-	proplist.add (ARDOUR::Properties::name, unique_file_name/*region_name*/);
-	proplist.add (ARDOUR::Properties::layer, 0);
-	proplist.add (ARDOUR::Properties::whole_file, true);
-	proplist.add (ARDOUR::Properties::external, false);
-  // proplist.add (ARDOUR::Properties::sync_position, 192000);
-
-
-	region = RegionFactory::create( sources, proplist );
-  (*regions).push_back( region );
-
-
-
-  /* NOTE Don't know what that's for */
-
-	// bool use_timestamp;
-	// use_timestamp = (pos == -1);
-	// if (use_timestamp && boost::dynamic_pointer_cast<AudioRegion>(r)) {
-	// 	boost::dynamic_pointer_cast<AudioRegion>(r)->special_set_position(sources[0]->natural_position());
-	// }
-	//
-	//
-	// /* if we're creating a new track, name it after the cleaned-up
-	//  * and "merged" region name.
-	//  */
-	//
-	// regions.push_back (r);
-	// int n = 0;
-	//
-	// for (vector<boost::shared_ptr<Region> >::iterator r = regions.begin(); r != regions.end(); ++r, ++n) {
-	// 	boost::shared_ptr<AudioRegion> ar = boost::dynamic_pointer_cast<AudioRegion> (*r);
-	//
-	// 	if (use_timestamp) {
-	// 		if (ar) {
-	//
-	// 			/* get timestamp for this region */
-	//
-	// 			const boost::shared_ptr<Source> s (ar->sources().front());
-	// 			const boost::shared_ptr<AudioSource> as = boost::dynamic_pointer_cast<AudioSource> (s);
-	//
-	// 			assert (as);
-	//
-	// 			if (as->natural_position() != 0) {
-	// 				pos = as->natural_position();
-	// 			} else {
-	// 				pos = 0;
-	// 			}
-	// 		} else {
-	// 			/* should really get first position in MIDI file, but for now, use 0 */
-	// 			pos = 0;
-	// 		}
-	// 	}
-	// }
-
-
-	return true;
-}
-
-
-
-static void set_session_range( Session *s, AAF_Iface *aafi )
-{
-  samplepos_t start = samplepos_t( eu2sample( s->sample_rate(), &aafi->compositionStart_editRate,  aafi->compositionStart ) );
-  samplepos_t end   = samplepos_t( eu2sample( s->sample_rate(), &aafi->compositionLength_editRate, aafi->compositionLength ) ) + start;
-
-  // error << "Session start(" << start << ")/end(" << end << "))" << endmsg;
-
-  s->set_session_extents( timepos_t(start), timepos_t(end) );
-}
-
-
-
-static std::shared_ptr<Region> create_region( vector<std::shared_ptr<Region> > source_regions, aafiAudioClip *aafAudioClip, std::shared_ptr<ARDOUR::Source> source, aafPosition_t clipOffset )
-{
-  wstring ws = aafAudioClip->Essence->unique_file_name;
-  string unique_file_name(ws.begin(), ws.end());
-
-  PropertyList proplist;
-
-  proplist.add( ARDOUR::Properties::start, eu2sample_fromclip( aafAudioClip, aafAudioClip->essence_offset ) );
-  proplist.add( ARDOUR::Properties::length, eu2sample_fromclip( aafAudioClip, aafAudioClip->len ) );
-  proplist.add( ARDOUR::Properties::name, unique_file_name );
-  proplist.add( ARDOUR::Properties::layer, 0 );
-  proplist.add( ARDOUR::Properties::whole_file, false );
-  proplist.add( ARDOUR::Properties::external, true );
-  /* NOTE position is set when calling add_region() */
-  // proplist.add (ARDOUR::Properties::position, 172800000/*eu2sample_fromclip( aafAudioClip, (aafAudioClip->pos  + aafAudioClip->track->Audio->tc->start) )*/ );
-
-
-  /* update source natural position
-   * NOTE: only because it matches native ardour session, dont know what it's used for.
-   * NOTE: dont know what it's used for ?
-   */
-  source->set_natural_position( timepos_t(eu2sample_fromclip( aafAudioClip, (aafAudioClip->pos + clipOffset) ) ) );
-
-  std::shared_ptr<Region> region = RegionFactory::create( source, proplist );
-
-  /* Enable "Move to Original Position" */
-
-  for ( vector<std::shared_ptr<Region>>::iterator region = source_regions.begin(); region != source_regions.end(); ++region ) {
-    if ( (*region)->source(0) == source ) {
-      (*region)->set_position( timepos_t(eu2sample_fromclip( aafAudioClip, (aafAudioClip->pos + clipOffset) ) - eu2sample_fromclip( aafAudioClip, aafAudioClip->essence_offset )) );
-    }
-  }
-
-  return region;
-}
-
-
-
-static void set_region_gain( aafiAudioClip *aafAudioClip, std::shared_ptr<Region> region )
-{
-  if ( aafAudioClip->gain && aafAudioClip->gain->flags & AAFI_AUDIO_GAIN_CONSTANT ) {
-    std::dynamic_pointer_cast<AudioRegion>(region)->set_scale_amplitude( aafRationalToFloat(aafAudioClip->gain->value[0]) );
-  }
-  // TODO: What about clip-gain automation ? No support in Ardour ? Convert to track level ?
-}
-
-
-
-static std::shared_ptr<AudioTrack> prepare_audio_track( aafiAudioClip *aafAudioClip, std::shared_ptr<Region> region, Session *s, aafPosition_t sessionStart )
-{
-  /* Add region to track
-   * ===================
-   * https://github.com/Ardour/ardour/blob/365f6d633731229e7bc5d37a5fe2c9107b527e28/libs/ardour/import_pt.cc#L327
-   */
-
-  aafiAudioTrack *aafTrack = aafAudioClip->track;
-
-  /* Use existing track if possible */
-  std::shared_ptr<AudioTrack> track = get_nth_audio_track( (aafTrack->number-1), s->get_routes() );
-
-  /* Or create a new track if needed */
-  if ( !track ) {
-
-    wstring ws_track_name = std::wstring( aafTrack->name );
-    string track_name = string(ws_track_name.begin(), ws_track_name.end());
-
-    PRINT_I( "Track number %i (%s) does not exist. Adding new track.\n", aafTrack->number, track_name.c_str() );
-
-    // TODO: second argument is "output_channels". How should it be set ?
-    list<std::shared_ptr<AudioTrack> > at( s->new_audio_track( aafTrack->format, 2, 0, 1, track_name, PresentationInfo::max_order, Normal ) );
-
-    if ( at.empty() ) {
-      PRINT_E( "Could not create new audio track.\n" );
-      ::exit( EXIT_FAILURE );
-    }
-
-    track = at.back();
-  }
-
-  /* Put region on track */
-  return track;
-}
-
-
-
-static void set_region_fade( aafiAudioClip *aafAudioClip, std::shared_ptr<Region> region )
-{
-  /* Set fades if any
-   * ================
-   *
-   * https://github.com/Ardour/ardour/blob/b84c99639f0dd28e210ed9c064429c17014093a7/libs/ardour/ardour/types.h#L705
-   *
-   * enum FadeShape {
-   *   FadeLinear,
-   *   FadeFast,
-   *   FadeSlow,
-   *   FadeConstantPower,
-   *   FadeSymmetric,
-   * };
-   *
-   * https://github.com/Ardour/ardour/blob/365f6d633731229e7bc5d37a5fe2c9107b527e28/libs/ardour/ardour/audioregion.h#L143
-   * https://github.com/Ardour/ardour/blob/365f6d633731229e7bc5d37a5fe2c9107b527e28/libs/temporal/temporal/types.h#L39
-   */
-
-  aafiTransition *fadein  = get_fadein( aafAudioClip->Item );
-  aafiTransition *fadeout = get_fadeout( aafAudioClip->Item );
-
-  if ( fadein == NULL ) {
-    fadein = get_xfade( aafAudioClip->Item );
-  }
-
-  FadeShape fade_shape;
-  samplecnt_t fade_len;
-
-  if ( fadein != NULL ) {
-    fade_shape = (fadein->flags & AAFI_INTERPOL_NONE)     ? FadeLinear :
-                 (fadein->flags & AAFI_INTERPOL_LINEAR)   ? FadeLinear :
-                 (fadein->flags & AAFI_INTERPOL_LOG)      ? FadeSymmetric :
-                 (fadein->flags & AAFI_INTERPOL_CONSTANT) ? FadeConstantPower :
-                 (fadein->flags & AAFI_INTERPOL_POWER)    ? FadeConstantPower :
-                 (fadein->flags & AAFI_INTERPOL_BSPLINE)  ? FadeLinear :
-                 FadeLinear;
-    fade_len = eu2sample_fromclip( aafAudioClip, fadein->len );
-
-    std::dynamic_pointer_cast<AudioRegion>(region)->set_fade_in( fade_shape, fade_len );
-  }
-
-  if ( fadeout != NULL ) {
-    fade_shape = (fadeout->flags & AAFI_INTERPOL_NONE)     ? FadeLinear :
-                 (fadeout->flags & AAFI_INTERPOL_LINEAR)   ? FadeLinear :
-                 (fadeout->flags & AAFI_INTERPOL_LOG)      ? FadeSymmetric :
-                 (fadeout->flags & AAFI_INTERPOL_CONSTANT) ? FadeConstantPower :
-                 (fadeout->flags & AAFI_INTERPOL_POWER)    ? FadeConstantPower :
-                 (fadeout->flags & AAFI_INTERPOL_BSPLINE)  ? FadeLinear :
-                 FadeLinear;
-    fade_len = eu2sample_fromclip( aafAudioClip, fadeout->len );
-
-    std::dynamic_pointer_cast<AudioRegion>(region)->set_fade_out( fade_shape, fade_len );
-  }
-}
-
-
-
 // static void set_session_video_from_aaf( Session *s, AAF_Iface *aafi )
 // {
 //   if ( aafi->Video->Tracks && aafi->Video->Tracks->Items ) {
@@ -653,6 +328,331 @@ static void set_region_fade( aafiAudioClip *aafAudioClip, std::shared_ptr<Region
 //     PRINT_E( "Could not retrieve video from AAF.\n" );
 //   }
 // }
+
+
+
+/*
+ * libs/ardour/import.cc
+ * - Reimplement since function was removed in 4620d13 : https://github.com/Ardour/ardour/commit/4620d138eefad57bc55e1901d8410c36803ce0d6 -
+ */
+
+static std::shared_ptr<AudioTrack> get_nth_audio_track( uint32_t nth, std::shared_ptr<RouteList const> routes )
+{
+	RouteList rl = *(routes);//(*(routes.reader ()));
+	rl.sort( Stripable::Sorter() );
+
+	for ( auto const& r: rl ) {
+		std::shared_ptr<AudioTrack> at = std::dynamic_pointer_cast<AudioTrack> (r);
+		if ( !at ) {
+			continue;
+		}
+		if ( nth-- == 0 ) {
+			return at;
+		}
+	}
+	return std::shared_ptr<AudioTrack> ();
+}
+
+
+
+static bool import_sndfile_as_region( Session *s, struct aafiAudioEssence *audioEssence, SrcQuality quality, timepos_t &pos, SourceList &sources, ImportStatus &status, vector<std::shared_ptr<Region> > *regions /* boost::shared_ptr<Region> r*/ )
+{
+  /* https://github.com/Ardour/ardour/blob/365f6d633731229e7bc5d37a5fe2c9107b527e28/libs/ardour/import_pt.cc#L82 */
+
+  wstring ws(audioEssence->usable_file_path);
+  string usable_file_path(ws.begin(), ws.end());
+
+  /* Import the source */
+  status.paths.clear();
+  status.paths.push_back( usable_file_path /*path*/);
+  status.current = 1; // TODO
+  status.total = 1; // TODO
+  status.freeze = false;
+  status.quality = quality;
+  status.replace_existing_source = false;
+  status.split_midi_channels = false;
+  status.import_markers = false;
+  status.done = false;
+  status.cancel = false;
+
+  s->import_files( status );
+
+  status.progress = 1.0;
+  sources.clear();
+
+  /* FIXME: There is no way to tell if cancel button was pressed
+   * or if the file failed to import, just that one of these occurred.
+   * We want status.cancel to reflect the user's choice only
+   */
+  if ( status.cancel && status.current > 1 )
+  {
+  	/* Succeeded to import file, assume user hit cancel */
+  	return false;
+  }
+  else if ( status.cancel && status.current == 1 )
+  {
+  	/* Failed to import file, assume user did not hit cancel */
+  	status.cancel = false;
+  	return false;
+  }
+
+
+  sources.push_back( status.sources.front() );
+
+  /* save ardour sourceID for later */
+  snprintf( audioEssence->ardour_src_id, 32, "%s", sources.back()->id().to_s().c_str() );
+
+
+  /* build peakfiles */
+  for ( SourceList::iterator x = sources.begin(); x != sources.end(); ++x )
+  {
+  	SourceFactory::setup_peakfile( *x, true );
+  }
+
+
+
+  // return true;
+
+
+
+  /* NOTE The following is required for the source to appear in source list */
+
+  /* Put the source on a region */
+  // vector<std::shared_ptr<Region> > regions;
+  std::shared_ptr<Region> region;
+  string region_name;
+
+
+  // /* take all the sources we have and package them up as a region */
+  //
+  // region_name = region_name_from_path (status.paths.front(), (sources.size() > 1), false);
+  //
+  // /* we checked in import_sndfiles() that there were not too many */
+  //
+  // while (RegionFactory::region_by_name (region_name)) {
+  // 	region_name = bump_name_once (region_name, '.');
+  // }
+
+  ws = audioEssence->unique_file_name;
+  string unique_file_name( ws.begin(), ws.end() );
+
+  PropertyList proplist;
+
+  proplist.add (ARDOUR::Properties::start,  0 /*eu2sample_fromclip( clip, clip->essence_offset )*/);
+  // proplist.add (ARDOUR::Properties::length, /*audioEssence->*/  /*eu2sample_fromclip( clip, clip->len )*/ sources[0]->length (pos));
+  proplist.add (ARDOUR::Properties::length, timecnt_t( sources[0]->length(), pos ));
+  // plist.add (ARDOUR::Properties::position, eu2sample_fromclip( aafAudioClip, (aafAudioClip->pos  + aafAudioClip->track->Audio->tc->start) ) );
+  proplist.add (ARDOUR::Properties::name, unique_file_name/*region_name*/);
+  proplist.add (ARDOUR::Properties::layer, 0);
+  proplist.add (ARDOUR::Properties::whole_file, true);
+  proplist.add (ARDOUR::Properties::external, false);
+  // proplist.add (ARDOUR::Properties::sync_position, 192000);
+
+
+  region = RegionFactory::create( sources, proplist );
+  (*regions).push_back( region );
+
+
+
+  /* NOTE Don't know what that's for */
+
+  // bool use_timestamp;
+  // use_timestamp = (pos == -1);
+  // if (use_timestamp && boost::dynamic_pointer_cast<AudioRegion>(r)) {
+  // 	boost::dynamic_pointer_cast<AudioRegion>(r)->special_set_position(sources[0]->natural_position());
+  // }
+  //
+  //
+  // /* if we're creating a new track, name it after the cleaned-up
+  //  * and "merged" region name.
+  //  */
+  //
+  // regions.push_back (r);
+  // int n = 0;
+  //
+  // for (vector<boost::shared_ptr<Region> >::iterator r = regions.begin(); r != regions.end(); ++r, ++n) {
+  // 	boost::shared_ptr<AudioRegion> ar = boost::dynamic_pointer_cast<AudioRegion> (*r);
+  //
+  // 	if (use_timestamp) {
+  // 		if (ar) {
+  //
+  // 			/* get timestamp for this region */
+  //
+  // 			const boost::shared_ptr<Source> s (ar->sources().front());
+  // 			const boost::shared_ptr<AudioSource> as = boost::dynamic_pointer_cast<AudioSource> (s);
+  //
+  // 			assert (as);
+  //
+  // 			if (as->natural_position() != 0) {
+  // 				pos = as->natural_position();
+  // 			} else {
+  // 				pos = 0;
+  // 			}
+  // 		} else {
+  // 			/* should really get first position in MIDI file, but for now, use 0 */
+  // 			pos = 0;
+  // 		}
+  // 	}
+  // }
+
+
+  return true;
+}
+
+
+
+static void set_session_range( Session *s, AAF_Iface *aafi )
+{
+  samplepos_t start = samplepos_t( eu2sample( s->sample_rate(), &aafi->compositionStart_editRate,  aafi->compositionStart ) );
+  samplepos_t end   = samplepos_t( eu2sample( s->sample_rate(), &aafi->compositionLength_editRate, aafi->compositionLength ) ) + start;
+
+  // error << "Session start(" << start << ")/end(" << end << "))" << endmsg;
+
+  s->set_session_extents( timepos_t(start), timepos_t(end) );
+}
+
+
+
+static std::shared_ptr<Region> create_region( vector<std::shared_ptr<Region> > source_regions, aafiAudioClip *aafAudioClip, std::shared_ptr<ARDOUR::Source> source, aafPosition_t clipOffset )
+{
+  wstring ws = aafAudioClip->Essence->unique_file_name;
+  string unique_file_name(ws.begin(), ws.end());
+
+  PropertyList proplist;
+
+  proplist.add( ARDOUR::Properties::start, eu2sample_fromclip( aafAudioClip, aafAudioClip->essence_offset ) );
+  proplist.add( ARDOUR::Properties::length, eu2sample_fromclip( aafAudioClip, aafAudioClip->len ) );
+  proplist.add( ARDOUR::Properties::name, unique_file_name );
+  proplist.add( ARDOUR::Properties::layer, 0 );
+  proplist.add( ARDOUR::Properties::whole_file, false );
+  proplist.add( ARDOUR::Properties::external, true );
+  /* NOTE position is set when calling add_region() */
+  // proplist.add (ARDOUR::Properties::position, 172800000/*eu2sample_fromclip( aafAudioClip, (aafAudioClip->pos  + aafAudioClip->track->Audio->tc->start) )*/ );
+
+
+  /* update source natural position
+   * NOTE: only because it matches native ardour session, dont know what it's used for.
+   * NOTE: dont know what it's used for ?
+   */
+  source->set_natural_position( timepos_t(eu2sample_fromclip( aafAudioClip, (aafAudioClip->pos + clipOffset) ) ) );
+
+  std::shared_ptr<Region> region = RegionFactory::create( source, proplist );
+
+  /* Enable "Move to Original Position" */
+
+  for ( vector<std::shared_ptr<Region>>::iterator region = source_regions.begin(); region != source_regions.end(); ++region ) {
+    if ( (*region)->source(0) == source ) {
+      (*region)->set_position( timepos_t(eu2sample_fromclip( aafAudioClip, (aafAudioClip->pos + clipOffset) ) - eu2sample_fromclip( aafAudioClip, aafAudioClip->essence_offset )) );
+    }
+  }
+
+  return region;
+}
+
+
+
+static void set_region_gain( aafiAudioClip *aafAudioClip, std::shared_ptr<Region> region )
+{
+  if ( aafAudioClip->gain && aafAudioClip->gain->flags & AAFI_AUDIO_GAIN_CONSTANT ) {
+    std::dynamic_pointer_cast<AudioRegion>(region)->set_scale_amplitude( aafRationalToFloat(aafAudioClip->gain->value[0]) );
+  }
+  // TODO: What about clip-gain automation ? No support in Ardour ? Convert to track level ?
+}
+
+
+
+static std::shared_ptr<AudioTrack> prepare_audio_track( aafiAudioClip *aafAudioClip, std::shared_ptr<Region> region, Session *s, aafPosition_t sessionStart )
+{
+  /* Add region to track
+   * ===================
+   * https://github.com/Ardour/ardour/blob/365f6d633731229e7bc5d37a5fe2c9107b527e28/libs/ardour/import_pt.cc#L327
+   */
+
+  aafiAudioTrack *aafTrack = aafAudioClip->track;
+
+  /* Use existing track if possible */
+  std::shared_ptr<AudioTrack> track = get_nth_audio_track( (aafTrack->number-1), s->get_routes() );
+
+  /* Or create a new track if needed */
+  if ( !track ) {
+
+    wstring ws_track_name = std::wstring( aafTrack->name );
+    string track_name = string(ws_track_name.begin(), ws_track_name.end());
+
+    PRINT_I( "Track number %i (%s) does not exist. Adding new track. >>>> %ls\n", aafTrack->number, track_name.c_str(), aafAudioClip->Essence->unique_file_name );
+
+    // TODO: second argument is "output_channels". How should it be set ?
+    list<std::shared_ptr<AudioTrack> > at( s->new_audio_track( aafTrack->format, 2, 0, 1, track_name, PresentationInfo::max_order, Normal ) );
+
+    if ( at.empty() ) {
+      PRINT_E( "Could not create new audio track.\n" );
+      ::exit( EXIT_FAILURE );
+    }
+
+    track = at.back();
+  }
+
+  /* Put region on track */
+  return track;
+}
+
+
+
+static void set_region_fade( aafiAudioClip *aafAudioClip, std::shared_ptr<Region> region )
+{
+  /* Set fades if any
+   * ================
+   *
+   * https://github.com/Ardour/ardour/blob/b84c99639f0dd28e210ed9c064429c17014093a7/libs/ardour/ardour/types.h#L705
+   *
+   * enum FadeShape {
+   *   FadeLinear,
+   *   FadeFast,
+   *   FadeSlow,
+   *   FadeConstantPower,
+   *   FadeSymmetric,
+   * };
+   *
+   * https://github.com/Ardour/ardour/blob/365f6d633731229e7bc5d37a5fe2c9107b527e28/libs/ardour/ardour/audioregion.h#L143
+   * https://github.com/Ardour/ardour/blob/365f6d633731229e7bc5d37a5fe2c9107b527e28/libs/temporal/temporal/types.h#L39
+   */
+
+  aafiTransition *fadein  = get_fadein( aafAudioClip->Item );
+  aafiTransition *fadeout = get_fadeout( aafAudioClip->Item );
+
+  if ( fadein == NULL ) {
+    fadein = get_xfade( aafAudioClip->Item );
+  }
+
+  FadeShape fade_shape;
+  samplecnt_t fade_len;
+
+  if ( fadein != NULL ) {
+    fade_shape = (fadein->flags & AAFI_INTERPOL_NONE)     ? FadeLinear :
+                 (fadein->flags & AAFI_INTERPOL_LINEAR)   ? FadeLinear :
+                 (fadein->flags & AAFI_INTERPOL_LOG)      ? FadeSymmetric :
+                 (fadein->flags & AAFI_INTERPOL_CONSTANT) ? FadeConstantPower :
+                 (fadein->flags & AAFI_INTERPOL_POWER)    ? FadeConstantPower :
+                 (fadein->flags & AAFI_INTERPOL_BSPLINE)  ? FadeLinear :
+                 FadeLinear;
+    fade_len = eu2sample_fromclip( aafAudioClip, fadein->len );
+
+    std::dynamic_pointer_cast<AudioRegion>(region)->set_fade_in( fade_shape, fade_len );
+  }
+
+  if ( fadeout != NULL ) {
+    fade_shape = (fadeout->flags & AAFI_INTERPOL_NONE)     ? FadeLinear :
+                 (fadeout->flags & AAFI_INTERPOL_LINEAR)   ? FadeLinear :
+                 (fadeout->flags & AAFI_INTERPOL_LOG)      ? FadeSymmetric :
+                 (fadeout->flags & AAFI_INTERPOL_CONSTANT) ? FadeConstantPower :
+                 (fadeout->flags & AAFI_INTERPOL_POWER)    ? FadeConstantPower :
+                 (fadeout->flags & AAFI_INTERPOL_BSPLINE)  ? FadeLinear :
+                 FadeLinear;
+    fade_len = eu2sample_fromclip( aafAudioClip, fadeout->len );
+
+    std::dynamic_pointer_cast<AudioRegion>(region)->set_fade_out( fade_shape, fade_len );
+  }
+}
 
 
 
@@ -818,6 +818,8 @@ int main( int argc, char* argv[] )
   uint32_t aaf_resolve_options = 0;
   uint32_t aaf_protools_options = 0;
   // bool replace_session_if_exists = false;
+
+  printf("using libaaf %s\n", LIBAAF_VERSION );
 
 	const char* optstring = "hLm:r:s:t:p:n:l:c:a:";
 
@@ -1159,6 +1161,7 @@ int main( int argc, char* argv[] )
       aafAudioClip = (aafiAudioClip*)&aafAudioItem->data;
 
       if ( aafAudioClip->Essence == NULL ) {
+        PRINT_E( "AAF clip has no essence\n" );
         continue;
       }
 
@@ -1170,41 +1173,46 @@ int main( int argc, char* argv[] )
 
       aafPosition_t sessionStart = convertEditUnit( aafAudioClip->track->Audio->tc->start, aafi->Audio->tc->edit_rate, aafAudioClip->track->edit_rate );
 
-      for ( SourceList::iterator source = sources.begin(); source != sources.end(); ++source ) {
+      SourceList::iterator source;
 
-        if ( strcmp( aafAudioClip->Essence->ardour_src_id, (*source)->id().to_s().c_str() ) != 0 ) {
-          continue;
+      for ( source = sources.begin(); source != sources.end(); ++source ) {
+        if ( strcmp( aafAudioClip->Essence->ardour_src_id, (*source)->id().to_s().c_str() ) == 0 ) {
+          break;
         }
-
-
-        PRINT_I( "Importing new clip [%+05.1lf dB] on track %i @%s\n",
-          (( aafAudioClip->gain && aafAudioClip->gain->flags & AAFI_AUDIO_GAIN_CONSTANT ) ? 20 * log10( aafRationalToFloat( aafAudioClip->gain->value[0] ) ) : 0),
-          aafAudioClip->track->number,
-          timecode_format_sampletime( eu2sample_fromclip( aafAudioClip, (aafAudioClip->pos + sessionStart) ), samplerate, aafAudioClip->track->Audio->tc->fps, false ).c_str()
-        );
-
-
-        /* Create Region */
-
-        std::shared_ptr<Region> region = create_region( source_regions, aafAudioClip, *source, sessionStart );
-
-        if ( !region ) {
-          PRINT_E( "Could not create new region.\n" );
-          ::exit( EXIT_FAILURE );
-        }
-
-
-        std::shared_ptr<AudioTrack> track = prepare_audio_track( aafAudioClip, region, s, sessionStart );
-
-        /* Put region on track */
-
-        std::shared_ptr<Playlist> playlist = track->playlist();
-        playlist->add_region( region, timepos_t(eu2sample_fromclip( aafAudioClip, (aafAudioClip->pos + sessionStart) ) ) );
-
-        set_region_gain( aafAudioClip, region );
-
-        set_region_fade( aafAudioClip, region );
       }
+
+      if ( source == sources.end() ) {
+        PRINT_E( "Ardour source not found for clip %s   (%ls)\n", aafAudioClip->Essence->ardour_src_id, aafAudioClip->Essence->unique_file_name );
+        continue;
+      }
+
+      PRINT_I( "Importing new clip [%+05.1lf dB] on track %i @%s\n",
+        (( aafAudioClip->gain && aafAudioClip->gain->flags & AAFI_AUDIO_GAIN_CONSTANT ) ? 20 * log10( aafRationalToFloat( aafAudioClip->gain->value[0] ) ) : 0),
+        aafAudioClip->track->number,
+        timecode_format_sampletime( eu2sample_fromclip( aafAudioClip, (aafAudioClip->pos + sessionStart) ), samplerate, aafAudioClip->track->Audio->tc->fps, false ).c_str()
+      );
+
+
+      /* Create Region */
+
+      std::shared_ptr<Region> region = create_region( source_regions, aafAudioClip, *source, sessionStart );
+
+      if ( !region ) {
+        PRINT_E( "Could not create new region.\n" );
+        ::exit( EXIT_FAILURE );
+      }
+
+
+      std::shared_ptr<AudioTrack> track = prepare_audio_track( aafAudioClip, region, s, sessionStart );
+
+      /* Put region on track */
+
+      std::shared_ptr<Playlist> playlist = track->playlist();
+      playlist->add_region( region, timepos_t(eu2sample_fromclip( aafAudioClip, (aafAudioClip->pos + sessionStart) ) ) );
+
+      set_region_gain( aafAudioClip, region );
+
+      set_region_fade( aafAudioClip, region );
     }
   }
 
