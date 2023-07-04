@@ -25,6 +25,7 @@ git clone https://github.com/agfline/LibAAF.git aaf
 
 cd aaf
 #git log | head
+LIBAAF_VERSION=$(git describe --tags --dirty --match "v*")
 git describe --tags
 #git reset --hard 8c84f15f124c0e0f00f0ad560518242cb213f840
 cd $TMP
@@ -51,7 +52,6 @@ rsync -auc --info=progress2 \
 
 rsync -auc --info=progress2 \
 	${AAF}include/libaaf.h \
-	${AAF}include/libaaf/version.h \
 	${AAF}include/libaaf/Resolve.h \
 	${AAF}include/libaaf/AAFIParser.h \
 	${AAF}include/libaaf/AAFCore.h \
@@ -73,6 +73,13 @@ rsync -auc --info=progress2 \
 	${AAF}include/libaaf/AAFDefs \
 	\
 	"$ASRC/libs/aaf/aaf/"
+
+echo "
+/* Ardour build */
+#ifndef LIBAAF_VERSION_H_
+#define LIBAAF_VERSION_H_
+#define LIBAAF_VERSION \"${LIBAAF_VERSION}\"
+#endif  /* LIBAAF_VERSION_H_ */" > "$ASRC/libs/aaf/aaf/version.h"
 
 cd "$ASRC/libs/aaf"
 for file in $(find . -type f); do
