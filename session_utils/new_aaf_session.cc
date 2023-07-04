@@ -542,7 +542,9 @@ static std::shared_ptr<Region> create_region( vector<std::shared_ptr<Region> > s
 
   for ( vector<std::shared_ptr<Region>>::iterator region = source_regions.begin(); region != source_regions.end(); ++region ) {
     if ( (*region)->source(0) == source ) {
+      // (*region)->set_position( timepos_t(eu2sample_fromclip( aafAudioClip, (aafAudioClip->pos + clipOffset) ) - eu2sample_fromclip( aafAudioClip, aafAudioClip->essence_offset )) );
       (*region)->set_position( timepos_t(eu2sample_fromclip( aafAudioClip, (aafAudioClip->pos + clipOffset) ) - eu2sample_fromclip( aafAudioClip, aafAudioClip->essence_offset )) );
+      break;
     }
   }
 
@@ -1139,6 +1141,17 @@ int main( int argc, char* argv[] )
 
 
   /*
+   *  Composition Timecode does not always share the same edit rate as tracks and clips.
+   *	Therefore, we need to do the conversion prior to any maths.
+   *  For exemple, if TC is 30000/1001 and audio clips are 48000/1, then TC->start has to be converted from FPS to samples.
+   */
+
+  // aafPosition_t sessionStart = convertEditUnit( aafAudioClip->track->Audio->tc->start, aafi->Audio->tc->edit_rate, aafAudioClip->track->edit_rate );
+  aafPosition_t sessionStart = eu2sample( s->sample_rate(), &aafi->compositionStart_editRate,  aafi->compositionStart );
+
+
+
+  /*
    *
    *  Create all audio clips
    *
@@ -1165,13 +1178,6 @@ int main( int argc, char* argv[] )
         continue;
       }
 
-      /*
-       *  Composition Timecode does not always share the same edit rate as tracks and clips.
-       *	Therefore, we need to do the conversion prior to any maths.
-       *  For exemple, if TC is 30000/1001 and audio clips are 48000/1, then TC->start has to be converted from FPS to samples.
-       */
-
-      aafPosition_t sessionStart = convertEditUnit( aafAudioClip->track->Audio->tc->start, aafi->Audio->tc->edit_rate, aafAudioClip->track->edit_rate );
 
       SourceList::iterator source;
 
@@ -1208,7 +1214,8 @@ int main( int argc, char* argv[] )
       /* Put region on track */
 
       std::shared_ptr<Playlist> playlist = track->playlist();
-      playlist->add_region( region, timepos_t(eu2sample_fromclip( aafAudioClip, (aafAudioClip->pos + sessionStart) ) ) );
+      // playlist->add_region( region, timepos_t(eu2sample_fromclip( aafAudioClip, (aafAudioClip->pos + sessionStart) ) ) );
+      playlist->add_region( region, timepos_t( aafAudioClip->pos + sessionStart ) );
 
       set_region_gain( aafAudioClip, region );
 
