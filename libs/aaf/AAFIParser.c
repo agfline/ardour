@@ -344,12 +344,16 @@ void _DUMP_OBJ( AAF_Iface *aafi, aafObject *Obj, struct trace_dump *__td, int st
 			aafObject *Segment        = aaf_get_propertyValue( Obj, PID_MobSlot_Segment );
 			aafUID_t  *DataDefinition = get_Component_DataDefinition( aafi, Segment );
 			wchar_t   *name           = aaf_get_propertyValueWstr( Obj, PID_MobSlot_SlotName );
-			int32_t   *slotID         = aaf_get_propertyValue( Obj, PID_MobSlot_SlotID );
+      int32_t   *slotID         = aaf_get_propertyValue( Obj, PID_MobSlot_SlotID );
+      int32_t   *trackNo        = aaf_get_propertyValue( Obj, PID_MobSlot_PhysicalTrackNumber );
 
-			printf("[%s%i%s] (DataDef : %s%ls%s) %s%ls ",
+			printf("[slot:%s%i%s track:%s%i%s] (DataDef : %s%ls%s) %s%ls ",
 				ANSI_COLOR_BOLD,
 				(slotID) ? *slotID : -1,
 				ANSI_COLOR_RESET,
+        ANSI_COLOR_BOLD,
+        (trackNo) ? *trackNo : -1,
+        ANSI_COLOR_RESET,
 				ANSI_COLOR_DARKGREY,
 				DataDefToText( aafi->aafd, DataDefinition ),
 				ANSI_COLOR_RESET,
@@ -2759,7 +2763,7 @@ static int parse_SourceClip( AAF_Iface *aafi, aafObject *SourceClip, td *__ptd )
 			// return -1;
 		}
 
-		if ( aafUIDCmp( aafi->aafd->Header.OperationalPattern, &AAFOPDef_EditProtocol ) )
+		// if ( aafUIDCmp( aafi->aafd->Header.OperationalPattern, &AAFOPDef_EditProtocol ) )
 		{
 
 			// if ( (CurrentUsageCode && aafUIDCmp( CurrentUsageCode, &AAFUsage_SubClip )) || CurrentUsageCode == NULL )
@@ -2961,8 +2965,8 @@ static int parse_SourceClip( AAF_Iface *aafi, aafObject *SourceClip, td *__ptd )
 
 			if ( aafi->ctx.current_track_is_multichannel == 0 )
 			{
-				if ( !aafUIDCmp( aafi->aafd->Header.OperationalPattern, &AAFOPDef_EditProtocol ) ||
-				     ( CurrentUsageCode && aafUIDCmp( CurrentUsageCode, &AAFUsage_TopLevel ) ) )
+				if ( /*!aafUIDCmp( aafi->aafd->Header.OperationalPattern, &AAFOPDef_EditProtocol ) ||*/
+				     aafUIDCmp( CurrentUsageCode, &AAFUsage_TopLevel ) )
 				{
 					/*
 					 *	NOTE for AAFOPDef_EditProtocol only :
@@ -4114,6 +4118,13 @@ static int parse_Mob( AAF_Iface *aafi, aafObject *Mob )
 
 	if ( aafUIDCmp( Mob->Class->ID, &AAFClassID_CompositionMob ) )
 	{
+    aafUID_t *UsageCode = (aafUID_t*)aaf_get_propertyValue( Mob, PID_Mob_UsageCode );
+
+    if ( aafUIDCmp( UsageCode, &AAFUsage_AdjustedClip ) ) {
+      DUMP_OBJ_ERROR( aafi, Mob, &__td, "Skipping AAFUsage_AdjustedClip" );
+      return -1;
+    }
+
 		parse_CompositionMob( aafi, Mob, &__td );
 	}
 	else if ( aafUIDCmp( Mob->Class->ID, &AAFClassID_MasterMob ) )
