@@ -97,7 +97,7 @@ static bool import_sndfile_as_region( Session *s, struct aafiAudioEssence *audio
 static void set_session_range( Session *s, AAF_Iface *aafi );
 static std::shared_ptr<Region> create_region( vector<std::shared_ptr<Region> > source_regions, aafiAudioClip *aafAudioClip, std::shared_ptr<ARDOUR::Source> source, aafPosition_t clipOffset, aafRational_t samplerate_r );
 static void set_region_gain( aafiAudioClip *aafAudioClip, std::shared_ptr<Region> region );
-static std::shared_ptr<AudioTrack> prepare_audio_track( aafiAudioClip *aafAudioClip, std::shared_ptr<Region> region, Session *s, aafPosition_t sessionStart );
+static std::shared_ptr<AudioTrack> prepare_audio_track( aafiAudioTrack *aafTrack, Session *s );
 static void set_region_fade( aafiAudioClip *aafAudioClip, std::shared_ptr<Region> region );
 static void set_session_timecode( Session *s, AAF_Iface *aafi );
 
@@ -568,14 +568,12 @@ static void set_region_gain( aafiAudioClip *aafAudioClip, std::shared_ptr<Region
 
 
 
-static std::shared_ptr<AudioTrack> prepare_audio_track( aafiAudioClip *aafAudioClip, std::shared_ptr<Region> region, Session *s, aafPosition_t sessionStart )
+static std::shared_ptr<AudioTrack> prepare_audio_track( aafiAudioTrack *aafTrack, Session *s )
 {
   /* Add region to track
    * ===================
    * https://github.com/Ardour/ardour/blob/365f6d633731229e7bc5d37a5fe2c9107b527e28/libs/ardour/import_pt.cc#L327
    */
-
-  aafiAudioTrack *aafTrack = aafAudioClip->track;
 
   /* Use existing track if possible */
   std::shared_ptr<AudioTrack> track = get_nth_audio_track( (aafTrack->number-1), s->get_routes() );
@@ -586,7 +584,7 @@ static std::shared_ptr<AudioTrack> prepare_audio_track( aafiAudioClip *aafAudioC
     wstring ws_track_name = std::wstring( aafTrack->name );
     string track_name = string(ws_track_name.begin(), ws_track_name.end());
 
-    PRINT_I( "Track number %i (%s) does not exist. Adding new track. >>>> %ls\n", aafTrack->number, track_name.c_str(), aafAudioClip->Essence->unique_file_name );
+    PRINT_I( "Track number %i (%s) does not exist. Adding new track.\n", aafTrack->number, track_name.c_str() );
 
     // TODO: second argument is "output_channels". How should it be set ?
     list<std::shared_ptr<AudioTrack> > at( s->new_audio_track( aafTrack->format, 2, 0, 1, track_name, PresentationInfo::max_order, Normal ) );
@@ -599,7 +597,6 @@ static std::shared_ptr<AudioTrack> prepare_audio_track( aafiAudioClip *aafAudioC
     track = at.back();
   }
 
-  /* Put region on track */
   return track;
 }
 
@@ -1181,6 +1178,8 @@ int main( int argc, char* argv[] )
   foreach_audioTrack( aafAudioTrack, aafi ) {
 
     // printf( "%lu\n", audioTrack->current_pos );
+    std::shared_ptr<AudioTrack> track = prepare_audio_track( aafAudioTrack, s );
+
 
     foreach_Item( aafAudioItem, aafAudioTrack ) {
 
@@ -1229,9 +1228,6 @@ int main( int argc, char* argv[] )
         PRINT_E( "Could not create new region.\n" );
         ::exit( EXIT_FAILURE );
       }
-
-
-      std::shared_ptr<AudioTrack> track = prepare_audio_track( aafAudioClip, region, s, sessionStart );
 
       /* Put region on track */
 
