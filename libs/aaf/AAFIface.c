@@ -732,7 +732,7 @@ aafiAudioTrack * aafi_newAudioTrack( AAF_Iface *aafi )
 
 	track->gain = NULL;
 
-	track->format = AAFI_TRACK_FORMAT_MONO;
+	track->format = AAFI_TRACK_FORMAT_NOT_SET;
 
 
 
@@ -944,6 +944,7 @@ aafiAudioEssence * aafi_newAudioEssence( AAF_Iface *aafi )
 	audioEssence->file_name = NULL;
 	audioEssence->unique_file_name = NULL;
 	audioEssence->clip_count = 0;
+	audioEssence->user = NULL;
 
 	aafi->Audio->Essences = audioEssence;
 
