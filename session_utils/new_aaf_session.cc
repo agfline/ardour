@@ -46,6 +46,7 @@
 #include "common.h"
 
 #include "aaf/libaaf.h"
+#include "aaf/utils.h"
 
 
 using namespace std;
@@ -123,7 +124,8 @@ static void usage()
                                     Default is the AAF composition name or file name.\n\
 \n\
   -l, --media-location      <path>  Path to AAF media files (when not embedded)\n\
-  -c, --media-cache         <path>  Path where AAF embedded media files will be extracted, prior to Ardour import.\n\
+  -c, --media-cache         <path>  Path where AAF embedded media files will be extracted, prior to Ardour import. Default is TEMP.\n\
+  -k, --keep-cache                  Do not clear cache. Useful for analysis of extracted audio files.\n\
 \n\
   -a, --aaf             <aaf file>  AAF file to load.\n\
 \n\
@@ -789,6 +791,139 @@ static void set_session_timecode( Session *s, AAF_Iface *aafi )
 
 
 
+
+
+
+#ifdef _WIN32
+  #include <io.h>
+  #define access _access_s
+  #define DIR_SEP '\\'
+  #define DIR_SEP_STR "\\"
+#else
+  #include <paths.h>
+  // #include <unistd.h>
+  #define DIR_SEP '/'
+  #define DIR_SEP_STR "/"
+#endif
+
+
+int prepare_cache( AAF_Iface *aafi, string *media_cache_path ) {
+
+  if ( !(*media_cache_path).empty() ) {
+    return 0;
+  }
+
+  const char *tmppath;
+
+#ifdef _WIN32
+  tmppath = GetTempPath();
+#else
+
+  if ( getenv("TMPDIR") ) {
+    tmppath = getenv("TMPDIR");
+  }
+  else {
+
+#if defined(P_tmpdir)
+    tmppath = P_tmpdir;
+#elif defined(_PATH_TMP)
+    tmppath = _PATH_TMP;
+#else
+    tmppath = "/tmp/";
+#endif // P_tmpdir
+
+  }
+#endif // _WIN32
+
+  const char *last_sep = "";
+
+  if ( *(tmppath+(strlen(tmppath))) != DIR_SEP ) {
+    last_sep = DIR_SEP_STR;
+  }
+
+  wstring compoName = wstring(aafi->compositionName);
+
+  if ( compoName.empty() ) {
+    /* TODO: fallback to AAF filename : aafi->aafd->cfbd->file */
+    compoName = L"Unknown AAF Composition";
+  }
+
+  /*
+   * sanitize for system path
+   * https://stackoverflow.com/a/31976060
+   */
+  for ( unsigned int i = 0; i < compoName.size(); i++ ) {
+    wchar_t c = compoName[i];
+    if (  c == '/' ||
+          c == '<' ||
+          c == '>' ||
+          c == ':' ||
+          c == '"' ||
+          c == '|' ||
+          c == '?' ||
+          c == '*' ||
+          c == '\\' ||
+          c < 0x30 ||
+          c > 0x7a )
+    {
+      compoName[i] = '_';
+    }
+  }
+
+  *media_cache_path = string(tmppath) + string(last_sep) + string(compoName.begin(), compoName.end()); //+ string(DIR_SEP_STR);
+
+
+  int i = 0;
+  string testdir = *media_cache_path;
+
+  while ( access( testdir.c_str(), 0 ) == 0 )
+    testdir = *media_cache_path + "_" + to_string(i++);
+
+  *media_cache_path = testdir;
+
+
+  mkdir( (*media_cache_path).c_str() , 0760 );
+
+  return 0;
+}
+
+
+
+void clear_cache( AAF_Iface *aafi, string media_cache_path )
+{
+  aafiAudioEssence *audioEssence = NULL;
+
+  foreachEssence( audioEssence, aafi->Audio->Essences ) {
+
+#ifdef _WIN32
+    wchar_t *filepath = audioEssence->usable_file_path;
+#else
+    char *filepath = (char*)malloc( wcslen(audioEssence->usable_file_path) + 1 );
+    snprintf( filepath, wcslen(audioEssence->usable_file_path) + 1, "%ls", audioEssence->usable_file_path );
+#endif
+
+    if ( access( filepath, 0 ) == 0 ) {
+      PRINT_W( "Would have removed from cache : %s\n", filepath );
+
+      // if ( remove( filepath ) < 0 ) {
+      //   PRINT_E( "Failed to remove a file from cache (%s) : %s\n", filepath, strerror(errno) );
+      // }
+    }
+    else {
+      PRINT_E( "Missing a file from cache (%s) : %s\n", filepath, strerror(errno) );
+    }
+
+#ifndef _WIN32
+    free( filepath );
+#endif
+  }
+
+  if ( rmdir( media_cache_path.c_str() ) < 0 ) {
+    PRINT_E( "Failed to remove cache directory (%s) : %s\n", media_cache_path.c_str(), strerror(errno) );
+  }
+}
+
+
 int main( int argc, char* argv[] )
 {
   ARDOUR::SampleFormat bitdepth = ARDOUR::FormatInt24;
@@ -800,6 +935,7 @@ int main( int argc, char* argv[] )
 	string session_name;
   string media_location_path;
   string media_cache_path;
+  int    keep_cache = 0;
   string aaf_file;
   uint32_t aaf_resolve_options = 0;
   uint32_t aaf_protools_options = 0;
@@ -825,6 +961,7 @@ int main( int argc, char* argv[] )
 
     { "media-location",  required_argument, 0, 'l' },
     { "media-cache",     required_argument, 0, 'c' },
+    { "keep-cache",      required_argument, 0, 'k' },
 
     { "aaf",             required_argument, 0, 'a' },
 
@@ -898,6 +1035,9 @@ int main( int argc, char* argv[] )
         media_cache_path = string(optarg);
         break;
 
+      case 'k':
+        keep_cache = 1;
+        break;
 
       case 'a':
         aaf_file = string(optarg);
@@ -960,6 +1100,14 @@ int main( int argc, char* argv[] )
 		PRINT_E( "Could not load AAF file.\n" );
 		::exit( EXIT_FAILURE );
 	}
+
+
+  if ( prepare_cache( aafi, &media_cache_path ) ) {
+    PRINT_E( "Could not prepare media cache path.\n" );
+    ::exit( EXIT_FAILURE );
+  }
+
+  printf( "Media Cache : %s\n\n", media_cache_path.c_str() );
 
   /*
    * At this stage, AFF was loaded and parsed,
@@ -1219,6 +1367,10 @@ int main( int argc, char* argv[] )
   }
 
   source_regions.clear();
+
+  if ( !keep_cache ) {
+    clear_cache( aafi, media_cache_path );
+  }
 
 
   /*
