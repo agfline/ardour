@@ -1,5 +1,9 @@
 #!/bin/sh
 
+LOCAL_AAF_PROJECT="$1"
+
+# exit
+
 if ! test -f wscript || ! test -d gtk2_ardour; then
 	echo "This script needs to run from ardour's top-level src tree"
 	exit 1
@@ -14,25 +18,39 @@ ASRC=`pwd`
 set -e
 mkdir -p "$ASRC/libs/aaf/aaf"
 
-TMP=`mktemp -d`
-test -d "$TMP"
-echo $TMP
+if [ -z "${LOCAL_AAF_PROJECT}" ]; then
 
-trap "rm -rf $TMP" EXIT
+	# Using git repos
 
-cd $TMP
-git clone https://github.com/agfline/LibAAF.git aaf
+	TMP=`mktemp -d`
+	test -d "$TMP"
+	echo $TMP
 
-cd aaf
-#git log | head
-LIBAAF_VERSION=$(git describe --tags --dirty --match "v*")
-git describe --tags
-#git reset --hard 8c84f15f124c0e0f00f0ad560518242cb213f840
-cd $TMP
+	trap "rm -rf $TMP" EXIT
 
-AAF=aaf/
+	cd $TMP
+	git clone https://github.com/agfline/LibAAF.git aaf
 
-rsync -auc --info=progress2 \
+	cd aaf
+	#git log | head
+	LIBAAF_VERSION=$(git describe --tags --dirty --match "v*")
+	git describe --tags
+	#git reset --hard 8c84f15f124c0e0f00f0ad560518242cb213f840
+	cd $TMP
+	AAF=aaf/
+	RSYNC_OPT="-auc --info=progress2"
+else
+
+	# Using pocal project
+
+	cd "${LOCAL_AAF_PROJECT}"
+	echo $PWD
+	AAF="./"
+	RSYNC_OPT="-ac --info=progress2"
+fi
+
+
+rsync $RSYNC_OPT \
 	${AAF}src/LibCFB/LibCFB.c \
   ${AAF}src/LibCFB/CFBDump.c \
   ${AAF}src/AAFCore/AAFCore.c \
@@ -50,7 +68,7 @@ rsync -auc --info=progress2 \
 	\
 	"$ASRC/libs/aaf"
 
-rsync -auc --info=progress2 \
+rsync $RSYNC_OPT \
 	${AAF}include/libaaf.h \
 	${AAF}include/libaaf/Resolve.h \
 	${AAF}include/libaaf/AAFIParser.h \
