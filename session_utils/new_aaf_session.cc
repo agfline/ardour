@@ -796,93 +796,78 @@ static void set_session_timecode( Session *s, AAF_Iface *aafi )
 
 #ifdef _WIN32
   #include <io.h>
-  #define access _access_s
-  #define DIR_SEP '\\'
-  #define DIR_SEP_STR "\\"
+  // #define access _access_s
+  // #define DIR_SEP '\\'
+  // #define DIR_SEP_STR "\\"
 #else
   #include <paths.h>
   // #include <unistd.h>
-  #define DIR_SEP '/'
-  #define DIR_SEP_STR "/"
+  // #define DIR_SEP '/'
+  // #define DIR_SEP_STR "/"
 #endif
 
 
 int prepare_cache( AAF_Iface *aafi, string *media_cache_path ) {
 
   if ( !(*media_cache_path).empty() ) {
+    /* if media cache is not empty, user forced cache path with --media-cache */
     return 0;
   }
 
-  const char *tmppath;
+  const char *tmppath = g_get_tmp_dir();
 
-#ifdef _WIN32
-  tmppath = GetTempPath();
-#else
-
-  if ( getenv("TMPDIR") ) {
-    tmppath = getenv("TMPDIR");
+  if ( !aafi->compositionName || aafi->compositionName[0] == 0x00 ) {
+    *media_cache_path = g_build_path( G_DIR_SEPARATOR_S, tmppath, g_basename( aafi->aafd->cfbd->file ), NULL ); //+ string(DIR_SEP_STR);
   }
   else {
 
-#if defined(P_tmpdir)
-    tmppath = P_tmpdir;
-#elif defined(_PATH_TMP)
-    tmppath = _PATH_TMP;
-#else
-    tmppath = "/tmp/";
-#endif // P_tmpdir
+    int compoNameLen = wcslen(aafi->compositionName) + 1;
+    char *compoName = (char*)malloc( compoNameLen );
 
-  }
-#endif // _WIN32
+    wcstombs( compoName, aafi->compositionName, compoNameLen );
 
-  const char *last_sep = "";
-
-  if ( *(tmppath+(strlen(tmppath))) != DIR_SEP ) {
-    last_sep = DIR_SEP_STR;
-  }
-
-  wstring compoName = wstring(aafi->compositionName);
-
-  if ( compoName.empty() ) {
-    /* TODO: fallback to AAF filename : aafi->aafd->cfbd->file */
-    compoName = L"Unknown AAF Composition";
-  }
-
-  /*
-   * sanitize for system path
-   * https://stackoverflow.com/a/31976060
-   */
-  for ( unsigned int i = 0; i < compoName.size(); i++ ) {
-    wchar_t c = compoName[i];
-    if (  c == '/' ||
-          c == '<' ||
-          c == '>' ||
-          c == ':' ||
-          c == '"' ||
-          c == '|' ||
-          c == '?' ||
-          c == '*' ||
-          c == '\\' ||
-          c < 0x30 ||
-          c > 0x7a )
-    {
-      compoName[i] = '_';
+    /*
+     * sanitize dir name
+     * https://stackoverflow.com/a/31976060
+     */
+    for ( int i = 0; i < (compoNameLen-1); i++ ) {
+      char c = compoName[i];
+      if ( c == '/' ||
+           c == '<' ||
+           c == '>' ||
+           c == ':' ||
+           c == '"' ||
+           c == '|' ||
+           c == '?' ||
+           c == '*' ||
+           c == '\\' ||
+           c < 0x30 ||
+           c > 0x7a )
+      {
+        compoName[i] = '_';
+      }
     }
-  }
 
-  *media_cache_path = string(tmppath) + string(last_sep) + string(compoName.begin(), compoName.end()); //+ string(DIR_SEP_STR);
+    *media_cache_path = g_build_path( G_DIR_SEPARATOR_S, tmppath, compoName, NULL );
+
+    g_free( compoName );
+  }
 
 
   int i = 0;
   string testdir = *media_cache_path;
 
-  while ( access( testdir.c_str(), 0 ) == 0 )
+  while ( g_file_test( testdir.c_str(), G_FILE_TEST_EXISTS ) )
     testdir = *media_cache_path + "_" + to_string(i++);
 
   *media_cache_path = testdir;
 
 
-  mkdir( (*media_cache_path).c_str() , 0760 );
+  if ( mkdir( (*media_cache_path).c_str() , 0760 ) < 0 ) {
+  // if ( g_mkdir_with_parents( (*media_cache_path).c_str(), 0760 ) < 0 ) {
+    PRINT_E( "Could not create cache directory at '%s' : %s\n", (*media_cache_path).c_str(), strerror(errno) );
+    return -1;
+  }
 
   return 0;
 }
@@ -895,14 +880,15 @@ void clear_cache( AAF_Iface *aafi, string media_cache_path )
 
   foreachEssence( audioEssence, aafi->Audio->Essences ) {
 
-#ifdef _WIN32
-    wchar_t *filepath = audioEssence->usable_file_path;
-#else
+// #ifdef _WIN32
+//     wchar_t *filepath = audioEssence->usable_file_path;
+// #else
     char *filepath = (char*)malloc( wcslen(audioEssence->usable_file_path) + 1 );
     snprintf( filepath, wcslen(audioEssence->usable_file_path) + 1, "%ls", audioEssence->usable_file_path );
-#endif
+// #endif
 
-    if ( access( filepath, 0 ) == 0 ) {
+    // if ( access( filepath, 0 ) == 0 ) {
+    if ( g_file_test( filepath, G_FILE_TEST_EXISTS ) ) {
       PRINT_W( "Would have removed from cache : %s\n", filepath );
 
       // if ( remove( filepath ) < 0 ) {
