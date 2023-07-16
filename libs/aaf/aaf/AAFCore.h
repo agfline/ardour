@@ -458,7 +458,7 @@ typedef struct _aafData
 		aafTimeStamp_t *LastModified;
 		aafVersionType_t *Version;
 		uint32_t ObjectModelVersion;
-		aafUID_t *OperationalPattern;
+		const aafUID_t *OperationalPattern;
 		// EssenceContainers; TODO AUIDSet_t
 		// DescriptiveSchemes: TODO AUIDSet_t
 
@@ -615,7 +615,7 @@ typedef struct _aafData
 	aafObject  *TaggedValueDefinition;
 
 
-	verbosityLevel_e verb;
+	struct dbg *dbg;
 
 } AAF_Data;
 
@@ -705,7 +705,7 @@ typedef struct _aafData
  *	@return  A pointer to the newly allocated structure.
  */
 
-AAF_Data * aaf_alloc( void );
+AAF_Data * aaf_alloc( struct dbg *dbg );
 
 
 /**
