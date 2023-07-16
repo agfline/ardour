@@ -892,11 +892,11 @@ void clear_cache( AAF_Iface *aafi, string media_cache_path )
 
     // if ( access( filepath, 0 ) == 0 ) {
     if ( g_file_test( filepath, G_FILE_TEST_EXISTS ) ) {
-      PRINT_W( "Would have removed from cache : %s\n", filepath );
+      // PRINT_W( "Would have removed from cache : %s\n", filepath );
 
-      // if ( remove( filepath ) < 0 ) {
-      //   PRINT_E( "Failed to remove a file from cache (%s) : %s\n", filepath, strerror(errno) );
-      // }
+      if ( remove( filepath ) < 0 ) {
+        PRINT_E( "Failed to remove a file from cache (%s) : %s\n", filepath, strerror(errno) );
+      }
     }
     else {
       PRINT_E( "Missing a file from cache (%s) : %s\n", filepath, strerror(errno) );
