@@ -880,6 +880,9 @@ void clear_cache( AAF_Iface *aafi, string media_cache_path )
 
   foreachEssence( audioEssence, aafi->Audio->Essences ) {
 
+    if ( !audioEssence->is_embedded ) {
+      continue;
+    }
 // #ifdef _WIN32
 //     wchar_t *filepath = audioEssence->usable_file_path;
 // #else
