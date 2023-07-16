@@ -1083,7 +1083,11 @@ int main( int argc, char* argv[] )
   aafi->ctx.options.trace = 1;
   aafi->ctx.options.resolve = aaf_resolve_options;
   aafi->ctx.options.protools = aaf_protools_options;
-  aafi->ctx.options.media_location = (media_location_path.empty()) ? NULL : strdup( media_location_path.c_str() );
+  // aafi->ctx.options.media_location = (media_location_path.empty()) ? NULL : strdup( media_location_path.c_str() );
+
+  if ( !media_location_path.empty() ) {
+    aafi_set_media_location( aafi, media_location_path.c_str() );
+  }
 
   if ( aafi_load_file( aafi, aaf_file.c_str() ) ) {
 		PRINT_E( "Could not load AAF file.\n" );
