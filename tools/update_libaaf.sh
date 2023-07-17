@@ -64,7 +64,8 @@ rsync $RSYNC_OPT \
   ${AAF}src/AAFIface/URIParser.c \
   ${AAF}src/AAFIface/ProTools.c \
   ${AAF}src/AAFIface/Resolve.c \
-  ${AAF}src/common/utils.c \
+	${AAF}src/common/utils.c \
+	${AAF}src/debug.c \
 	\
 	"$ASRC/libs/aaf"
 

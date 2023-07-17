@@ -30,6 +30,7 @@ libaaf_sources = [
 	'RIFFParser.c',
 	'URIParser.c',
 	'utils.c',
+	'debug.c',
 ]
 
 def options(opt):
