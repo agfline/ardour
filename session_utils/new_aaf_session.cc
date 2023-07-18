@@ -67,7 +67,7 @@ using namespace PBD;
  *    - Track pan
  *    - Track level automation
  *    - Track pan automation
- *    - Region level automation ?
+ *    x Region level automation
  *    - Session timecode offset (so the very begining of the timeline starts at eg. 01:00:00:00)
  *    - Markers
  *    x Multichannel audio file import (AAFOperationDef_AudioChannelCombiner)
@@ -97,7 +97,7 @@ static std::shared_ptr<AudioTrack> get_nth_audio_track( uint32_t nth, std::share
 static bool import_sndfile_as_region( Session *s, struct aafiAudioEssence *audioEssence, SrcQuality quality, timepos_t &pos, SourceList &sources, ImportStatus &status, vector<std::shared_ptr<Region> > *regions /* boost::shared_ptr<Region> r*/ );
 static void set_session_range( Session *s, AAF_Iface *aafi );
 static std::shared_ptr<Region> create_region( vector<std::shared_ptr<Region> > source_regions, aafiAudioClip *aafAudioClip, SourceList& oneClipSources, aafPosition_t clipOffset, aafRational_t samplerate_r );
-static void set_region_gain( aafiAudioClip *aafAudioClip, std::shared_ptr<Region> region );
+static void set_region_gain( aafiAudioClip *aafAudioClip, std::shared_ptr<Region> region, Session *s );
 static std::shared_ptr<AudioTrack> prepare_audio_track( aafiAudioTrack *aafTrack, Session *s );
 static void set_region_fade( aafiAudioClip *aafAudioClip, std::shared_ptr<Region> region );
 static void set_session_timecode( Session *s, AAF_Iface *aafi );
@@ -542,12 +542,21 @@ static std::shared_ptr<Region> create_region( vector<std::shared_ptr<Region> > s
 
 
 
-static void set_region_gain( aafiAudioClip *aafAudioClip, std::shared_ptr<Region> region )
+static void set_region_gain( aafiAudioClip *aafAudioClip, std::shared_ptr<Region> region, Session *s )
 {
   if ( aafAudioClip->gain && aafAudioClip->gain->flags & AAFI_AUDIO_GAIN_CONSTANT ) {
     std::dynamic_pointer_cast<AudioRegion>(region)->set_scale_amplitude( aafRationalToFloat(aafAudioClip->gain->value[0]) );
   }
-  // TODO: What about clip-gain automation ? No support in Ardour ? Convert to track level ?
+
+  if ( aafAudioClip->automation ) {
+    aafiAudioGain *level = aafAudioClip->automation;
+    std::shared_ptr<AudioRegion> ar = std::dynamic_pointer_cast<AudioRegion>(region);
+    std::shared_ptr<AutomationList> al = ar->envelope();
+
+    for ( int i = 0; i < level->pts_cnt; i++ ) {
+      al->fast_simple_add( timepos_t( aafRationalToFloat( level->time[i] ) * region->length().samples()/*s->sample_rate()*/ ), aafRationalToFloat( level->value[i] ) );
+  	}
+  }
 }
 
 
@@ -1346,7 +1355,7 @@ int main( int argc, char* argv[] )
       playlist->add_region( region, timepos_t( clipPos + sessionStart ) );
 
 
-      set_region_gain( aafAudioClip, region );
+      set_region_gain( aafAudioClip, region, s );
 
       set_region_fade( aafAudioClip, region );
     }
