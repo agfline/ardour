@@ -495,7 +495,9 @@ static void set_session_range( Session *s, AAF_Iface *aafi )
   samplepos_t start = samplepos_t( eu2sample( s->sample_rate(), &aafi->compositionStart_editRate,  aafi->compositionStart ) );
   samplepos_t end   = samplepos_t( eu2sample( s->sample_rate(), &aafi->compositionLength_editRate, aafi->compositionLength ) ) + start;
 
-  s->set_session_extents( timepos_t(start), timepos_t(end) );
+  /* https://github.com/agfline/LibAAF/issues/5#issuecomment-1632522578 */
+  // s->set_session_extents( timepos_t(start), timepos_t(end) );
+  s->maybe_update_session_range( timepos_t(start), timepos_t(end) );
 }
 
 
