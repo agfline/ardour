@@ -69,11 +69,11 @@ using namespace PBD;
  *    - Track pan automation
  *    x Region level automation
  *    - Session timecode offset (so the very begining of the timeline starts at eg. 01:00:00:00)
- *    - Markers
+ *    x Markers
  *    x Multichannel audio file import (AAFOperationDef_AudioChannelCombiner)
  *    - Multichannel region from multiple source audio files (1 file per channel) ?
  *    - Mono region from a specific channel of a multichannel file ?
- *    - Muted region
+ *    x Muted region
  */
 
 
@@ -1357,22 +1357,39 @@ int main( int argc, char* argv[] )
 
       set_region_gain( aafAudioClip, region, s );
 
+
       set_region_fade( aafAudioClip, region );
+
+
+      if ( aafAudioClip->mute ) {
+        region->set_muted( true );
+      }
     }
   }
 
 
-  foreachEssence( audioEssence, aafi->Audio->Essences ) {
-    if ( audioEssence && audioEssence->user ) {
-      static_cast<SourceList*>(audioEssence->user)->clear();
+
+  aafiMarker *marker = NULL;
+
+  foreachMarker( marker, aafi ) {
+
+    aafPosition_t markerStart = sessionStart + convertEditUnit( marker->start, *marker->edit_rate, samplerate_r );
+    aafPosition_t markerEnd   = sessionStart + convertEditUnit( (marker->start + marker->length), *marker->edit_rate, samplerate_r );
+
+    wstring markerName(marker->name);
+
+    Location *location;
+
+    if ( marker->length == 0 ) {
+      location = new Location( *s, timepos_t(markerStart), timepos_t(markerStart), string(markerName.begin(), markerName.end()), Location::Flags( Location::IsMark ) );
     }
+    else {
+      location = new Location( *s, timepos_t(markerStart), timepos_t(markerEnd), string(markerName.begin(), markerName.end()), Location::Flags( Location::IsRangeMarker ) );
+    }
+
+    s->locations()->add( location, true );
   }
 
-  source_regions.clear();
-
-  if ( !keep_cache ) {
-    clear_cache( aafi, media_cache_path );
-  }
 
 
   /*
@@ -1399,13 +1416,29 @@ int main( int argc, char* argv[] )
   set_session_timecode( s, aafi );
 
 
-
-
   import_status.progress = 1.0;
 	import_status.done = true;
 	s->save_state("");
 	import_status.sources.clear();
   import_status.all_done = true;
+
+
+
+  /* clear */
+
+  foreachEssence( audioEssence, aafi->Audio->Essences ) {
+    if ( audioEssence && audioEssence->user ) {
+      static_cast<SourceList*>(audioEssence->user)->clear();
+    }
+  }
+
+  source_regions.clear();
+
+  if ( !keep_cache ) {
+    clear_cache( aafi, media_cache_path );
+  }
+
+
 
 
 
