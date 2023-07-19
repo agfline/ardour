@@ -704,7 +704,7 @@ unsigned char * cfb_getMiniSector( CFB_Data *cfbd, cfbSectorID_t id )
 
 	if ( cfbd->fat_sz > 0 && id >= cfbd->miniFat_sz )
 	{
-		error( "Asking for an out of range MiniFAT sector @ index %u (Maximum MiniFAT index is %u)", id, cfbd->miniFat_sz );
+		error( "Asking for an out of range MiniFAT sector @ index %u (0x%x) (Maximum MiniFAT index is %u)", id, id, cfbd->miniFat_sz );
 		return NULL;
 	}
 
@@ -778,9 +778,9 @@ uint64_t cfb_getStream( CFB_Data *cfbd, cfbNode *node, unsigned char **stream, u
 		return 0;
 	}
 
-	*stream    = calloc( stream_len, sizeof(unsigned char) );
+	*stream = calloc( stream_len, sizeof(unsigned char) );
 
-	if ( stream == NULL )
+	if ( *stream == NULL )
 	{
 		error( "%s.", strerror( errno ) );
 		return 0;
@@ -796,6 +796,11 @@ uint64_t cfb_getStream( CFB_Data *cfbd, cfbNode *node, unsigned char **stream, u
 	if ( stream_len < cfbd->hdr->_ulMiniSectorCutoff ) // mini-stream
 		cfb_foreachMiniSectorInChain( cfbd, buf, id )
 		{
+			if ( !buf ) {
+				free( *stream );
+				*stream = NULL;
+				return 0;
+			}
 
 			cpy_sz = ( (stream_len - offset) < (uint64_t)(1<<cfbd->hdr->_uMiniSectorShift) ) ?
 			           (stream_len - offset) : (uint64_t)(1<<cfbd->hdr->_uMiniSectorShift);
@@ -961,9 +966,10 @@ static int cfb_retrieveDiFAT( CFB_Data *cfbd )
 
 	if ( csectDif != cfbd->hdr->_csectDif )
 	{
-		warning( "cfbd->hdr->_csectDif value seems wrong (%u). Correcting from cfbd->hdr->_csectFat.", cfbd->hdr->_csectDif );
+		warning( "cfbd->hdr->_csectDif value seems wrong (%u)", cfbd->hdr->_csectDif );
+		// warning( "cfbd->hdr->_csectDif value seems wrong (%u). Correcting from cfbd->hdr->_csectFat.", cfbd->hdr->_csectDif );
 
-		cfbd->hdr->_csectDif = csectDif;
+		// cfbd->hdr->_csectDif = csectDif;
 	}
 
 	if ( csectDif == 0 && cfbd->hdr->_sectDifStart != CFB_END_OF_CHAIN )
