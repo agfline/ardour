@@ -837,29 +837,29 @@ int prepare_cache( AAF_Iface *aafi, string *media_cache_path ) {
 
     wcstombs( compoName, aafi->compositionName, compoNameLen );
 
-    /*
-     * sanitize dir name
-     * https://stackoverflow.com/a/31976060
-     */
-    for ( int i = 0; i < (compoNameLen-1); i++ ) {
-      char c = compoName[i];
-      if ( c == '/' ||
-           c == '<' ||
-           c == '>' ||
-           c == ':' ||
-           c == '"' ||
-           c == '|' ||
-           c == '?' ||
-           c == '*' ||
-           c == '\\' ||
-           c < 0x30 ||
-           c > 0x7a )
-      {
-        compoName[i] = '_';
-      }
-    }
+    // /*
+    //  * sanitize dir name
+    //  * https://stackoverflow.com/a/31976060
+    //  */
+    // for ( int i = 0; i < (compoNameLen-1); i++ ) {
+    //   char c = compoName[i];
+    //   if ( c == '/' ||
+    //        c == '<' ||
+    //        c == '>' ||
+    //        c == ':' ||
+    //        c == '"' ||
+    //        c == '|' ||
+    //        c == '?' ||
+    //        c == '*' ||
+    //        c == '\\' ||
+    //        c < 0x30 ||
+    //        c > 0x7a )
+    //   {
+    //     compoName[i] = '_';
+    //   }
+    // }
 
-    *media_cache_path = g_build_path( G_DIR_SEPARATOR_S, tmppath, compoName, NULL );
+    *media_cache_path = g_build_path( G_DIR_SEPARATOR_S, tmppath, clean_filename(compoName), NULL );
 
     g_free( compoName );
   }
