@@ -24,6 +24,9 @@
 #include <stdarg.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define ANSI_COLOR_RED      "\033[38;5;124m" //"\x1b[31m"
 #define ANSI_COLOR_GREEN    "\x1b[92m"
@@ -37,6 +40,35 @@
 #define ANSI_COLOR_RESET    "\x1b[0m"
 
 
+#ifdef _WIN32
+  #define DIR_SEP '\\'
+  #define DIR_SEP_STR "\\"
+  /*
+   * swprintf() specific string format identifiers
+   * https://learn.microsoft.com/en-us/cpp/c-runtime-library/format-specification-syntax-printf-and-wprintf-functions?view=msvc-170#type
+   */
+  #define WPRIs  L"S" // char*
+  #define WPRIws L"s" // wchar_t*
+#else
+  #define DIR_SEP '/'
+  #define DIR_SEP_STR "/"
+  /*
+   * swprintf() specific string format identifiers
+   * https://learn.microsoft.com/en-us/cpp/c-runtime-library/format-specification-syntax-printf-and-wprintf-functions?view=msvc-170#type
+   */
+  #define WPRIs  L"s"  // char*
+  #define WPRIws L"ls" // wchar_t*
+#endif
+
+#define IS_DIR_SEP(c) \
+  ( (c) == DIR_SEP || (c) == '/' )
+
+
+wchar_t * utoa( wchar_t *str );
+char * clean_filename( char *filename );
+char * build_path( const char *sep, const char *first, ... );
+const char * fop_get_file( const char *filepath );
+
 int snprintf_realloc( char **str, int *size, size_t offset, const char *format, ... );
 int vsnprintf_realloc( char **str, int *size, int offset, const char *fmt, va_list *args );
 
@@ -45,8 +77,6 @@ char * c99strdup( const char *src );
 size_t utf16toa( char *astr, uint16_t alen, uint16_t *wstr, uint16_t wlen );
 wchar_t * atowchar( const char *astr, uint16_t alen );
 
-
-wchar_t * eascii_to_ascii( wchar_t *str );
 
 char *remove_file_ext (char* myStr, char extSep, char pathSep);
 
@@ -57,5 +87,9 @@ int dump_hex( const unsigned char *stream, size_t stream_sz, char **buf, int *bu
 char * url_decode( char *dst, char *src );
 
 wchar_t * wurl_decode( wchar_t *dst, wchar_t *src );
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // ! __utils_h__
