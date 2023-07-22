@@ -23,6 +23,7 @@
 #include <getopt.h>
 #include <iostream>
 #include <glibmm.h>
+#include <locale.h>
 
 #include <libxml/tree.h>
 #include <libxml/parser.h>
@@ -926,6 +927,8 @@ void clear_cache( AAF_Iface *aafi, string media_cache_path )
 
 int main( int argc, char* argv[] )
 {
+  setlocale( LC_ALL, "" );
+
   ARDOUR::SampleFormat bitdepth = ARDOUR::FormatInt24;
   int    samplesize     = 0;
 	int    samplerate     = 0;
