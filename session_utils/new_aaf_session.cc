@@ -1168,7 +1168,7 @@ int main( int argc, char* argv[] )
 
 	if ( session_name.empty() ) {
 
-    if ( aafi->compositionName ) {
+    if ( aafi->compositionName && aafi->compositionName[0] != 0x00 ) {
       wstring ws_session_name = std::wstring( aafi->compositionName );
       session_name = string(ws_session_name.begin(), ws_session_name.end());
       PRINT_I( "Using AAF composition name for Ardour session name : %ls\n", aafi->compositionName );
@@ -1191,6 +1191,8 @@ int main( int argc, char* argv[] )
       PRINT_I( "AAF has no composition name, using AAF file name for Ardour session name : %s\n", session_name.c_str() );
     }
 	}
+
+  clean_filename( &session_name[0] );
 
   if ( Glib::file_test( string(output_folder + G_DIR_SEPARATOR + session_name), Glib::FILE_TEST_IS_DIR ) ) {
     // if ( !replace_session_if_exists ) {
