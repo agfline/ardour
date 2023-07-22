@@ -122,7 +122,8 @@ static void usage()
   -t, --template        <template>  Use given template for new session.\n\
   -p, --session-path        <path>  Where to store the new session folder.\n\
   -n, --session-name        <name>  The new session name. A new folder will be created into session path with that name.\n\
-                                    Default is the AAF composition name or file name.\n\
+                                    Default is the AAF composition name or file name as a fallback.\n\
+                                    Set <name> to AAFFILE to force the use of AAF file name as session name.\n\
 \n\
   -l, --media-location      <path>  Path to AAF media files (when not embedded)\n\
   -c, --media-cache         <path>  Path where AAF embedded media files will be extracted, prior to Ardour import. Default is TEMP.\n\
@@ -1166,31 +1167,33 @@ int main( int argc, char* argv[] )
   }
 
 
-	if ( session_name.empty() ) {
-
-    if ( aafi->compositionName && aafi->compositionName[0] != 0x00 ) {
-      wstring ws_session_name = std::wstring( aafi->compositionName );
-      session_name = string(ws_session_name.begin(), ws_session_name.end());
-      PRINT_I( "Using AAF composition name for Ardour session name : %ls\n", aafi->compositionName );
-    }
-    else {
-      /*
-       * Code from gtk2_ardour/utils_videotl.cc
-       * VideoUtils::strip_file_extension()
-       */
-      std::string infile = Glib::path_get_basename(string(aafi->aafd->cfbd->file));
-      char *ext, *bn = strdup(infile.c_str());
-      if ((ext=strrchr(bn, '.'))) {
-        if (!strchr(ext, G_DIR_SEPARATOR)) {
-          *ext = 0;
-        }
+  if ( session_name.empty() && aafi->compositionName && aafi->compositionName[0] != 0x00 ) {
+    wstring ws_session_name = std::wstring( aafi->compositionName );
+    session_name = string(ws_session_name.begin(), ws_session_name.end());
+    PRINT_I( "Using AAF composition name for Ardour session name : %ls\n", aafi->compositionName );
+  }
+  else if ( session_name.empty() || session_name == "AAFFILE" ) {
+    /*
+     * Code from gtk2_ardour/utils_videotl.cc
+     * VideoUtils::strip_file_extension()
+     */
+    std::string infile = Glib::path_get_basename(string(aafi->aafd->cfbd->file));
+    char *ext, *bn = strdup(infile.c_str());
+    if ((ext=strrchr(bn, '.'))) {
+      if (!strchr(ext, G_DIR_SEPARATOR)) {
+        *ext = 0;
       }
-      session_name = std::string(bn);
-      free(bn);
+    }
+    session_name = std::string(bn);
+    free(bn);
 
+    if ( session_name.empty() ) {
       PRINT_I( "AAF has no composition name, using AAF file name for Ardour session name : %s\n", session_name.c_str() );
     }
-	}
+    else {
+      PRINT_I( "Force using AAF file name for Ardour session name : %s\n", session_name.c_str() );
+    }
+  }
 
   clean_filename( &session_name[0] );
 
