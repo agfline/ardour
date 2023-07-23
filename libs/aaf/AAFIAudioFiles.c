@@ -479,7 +479,7 @@ int parse_audio_summary( AAF_Iface *aafi, aafiAudioEssence *audioEssence )
     // dump_hex( audioEssence->summary->val, audioEssence->summary->len );
 
 
-    rc = riff_parseAudioFile( &RIFFAudioFile, &embeddedAudioDataReaderCallback, audioEssence->summary->val, &audioEssence->summary->len, aafi, aafi->dbg );
+    rc = riff_parseAudioFile( &RIFFAudioFile, RIFF_PARSE_ONLY_HEADER, &embeddedAudioDataReaderCallback, audioEssence->summary->val, &audioEssence->summary->len, aafi, aafi->dbg );
 
     if ( rc < 0 ) {
       warning( "TODO: Could not parse embedded essence summary. Should try essence data stream ?" );
@@ -521,7 +521,7 @@ int parse_audio_summary( AAF_Iface *aafi, aafiAudioEssence *audioEssence )
     }
 
 
-    rc = riff_parseAudioFile( &RIFFAudioFile, &externalAudioDataReaderCallback, fp, externalFilePath, aafi, aafi->dbg );
+    rc = riff_parseAudioFile( &RIFFAudioFile, RIFF_PARSE_ONLY_HEADER, &externalAudioDataReaderCallback, fp, externalFilePath, aafi, aafi->dbg );
 
     if ( rc < 0 ) {
       error( "TODO IF MP3 ? Failed parsing external essence file : %s", externalFilePath );
@@ -582,14 +582,14 @@ static size_t externalAudioDataReaderCallback( unsigned char *buf, size_t offset
   AAF_Iface *aafi = (AAF_Iface*)user3;
 
   if ( fseek( fp, offset, SEEK_SET ) < 0 ) {
-    error( "Could not seek to %lu in file '%s' : %s", offset, filename, strerror(errno) );
+    error( "Could not seek to %zu in file '%s' : %s", offset, filename, strerror(errno) );
     return -1;
   }
 
   size_t read = fread( buf, sizeof(unsigned char), reqLen, fp );
 
   if ( read < reqLen ) {
-    error( "File read failed at %lu (expected %lu, read %lu) in file '%s' : %s", offset, reqLen, read, filename, strerror(errno) );
+    error( "File read failed at %zu (expected %zu, read %zu) in file '%s' : %s", offset, reqLen, read, filename, strerror(errno) );
     return -1;
   }
 

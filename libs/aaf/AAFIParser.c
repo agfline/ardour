@@ -72,18 +72,6 @@
 
 
 
-#ifndef uint
-#define uint unsigned int // windows
-#endif
-
-#ifdef _WIN32
-  #define WPRIs  L"S" // char*
-	#define WPRIws L"s" // wchar_t*
-#else
-  #define WPRIs  L"s"  // char*
-	#define WPRIws L"ls" // wchar_t*
-#endif
-
 #define debug( ... ) \
 	_dbg( aafi->dbg, aafi, DEBUG_SRC_ID_AAF_IFACE, VERB_DEBUG, __VA_ARGS__ )
 
@@ -98,6 +86,7 @@
 
 
 
+static aafRational_t AAFI_DEFAULT_TC_EDIT_RATE = { 25, 1 };
 
 
 // #define OK      0
@@ -244,20 +233,19 @@ static void xplore_StrongObjectReferenceVector( AAF_Iface *aafi, aafObject *ObjC
 		     aaf_get_property( Obj, PID_TaggedValue_Value ) )
 		{
 			wchar_t  *name = aaf_get_propertyValueWstr( Obj, PID_TaggedValue_Name );
-			void    *value = aaf_get_propertyIndirectValue( Obj, PID_TaggedValue_Value );
-			aafUID_t *type = aaf_get_propertyIndirectValueType( Obj, PID_TaggedValue_Value );
+      aafIndirect_t *indirect = aaf_get_propertyIndirect( Obj, PID_TaggedValue_Value, &AUID_NULL );
 
-			if ( aafUIDCmp( type, &AAFTypeID_Int32 ) ) {
-				offset += snprintf_realloc( &dbg->_dbg_msg, &dbg->_dbg_msg_size, offset, "Tagged     |     Name: %ls%*s      Value (%ls)  : %i\n", name, 56-(int)wcslen(name), " ", TypeIDToText(type), *(int32_t*)value );
+			if ( aafUIDCmp( &indirect->TypeDef, &AAFTypeID_Int32 ) ) {
+				offset += snprintf_realloc( &dbg->_dbg_msg, &dbg->_dbg_msg_size, offset, "Tagged     |     Name: %ls%*s      Value (%ls)  : %i\n", name, 56-(int)wcslen(name), " ", TypeIDToText(&indirect->TypeDef), *(int32_t*)indirect->Value );
 			}
 			else
-			if ( aafUIDCmp( type, &AAFTypeID_String ) ) {
-				value = aaf_get_propertyIndirectValueWstr( Obj, PID_TaggedValue_Value );
-				offset += snprintf_realloc( &dbg->_dbg_msg, &dbg->_dbg_msg_size, offset, "Tagged     |     Name: %ls%*s      Value (%ls) : %ls\n", name, 56-(int)wcslen(name), " ", TypeIDToText(type), (wchar_t*)value );
-				free( value );
+			if ( aafUIDCmp( &indirect->TypeDef, &AAFTypeID_String ) ) {
+				wchar_t *wstr = cfb_w16towchar( NULL, (uint16_t*)indirect->Value, CFB_W16TOWCHAR_STRLEN );
+				offset += snprintf_realloc( &dbg->_dbg_msg, &dbg->_dbg_msg_size, offset, "Tagged     |     Name: %ls%*s      Value (%ls) : %ls\n", name, 56-(int)wcslen(name), " ", TypeIDToText(&indirect->TypeDef), wstr );
+				free( wstr );
 			}
 			else {
-				offset += snprintf_realloc( &dbg->_dbg_msg, &dbg->_dbg_msg_size, offset, "Tagged     |     Name: %ls%*s      Value (%s%ls%s) : %sUNKNOWN_TYPE%s\n", name, 56-(int)wcslen(name), " ", ANSI_COLOR_RED, TypeIDToText(type), ANSI_COLOR_RESET, ANSI_COLOR_RED, ANSI_COLOR_RESET );
+				offset += snprintf_realloc( &dbg->_dbg_msg, &dbg->_dbg_msg_size, offset, "Tagged     |     Name: %ls%*s      Value (%s%ls%s) : %sUNKNOWN_TYPE%s\n", name, 56-(int)wcslen(name), " ", ANSI_COLOR_RED, TypeIDToText(&indirect->TypeDef), ANSI_COLOR_RESET, ANSI_COLOR_RED, ANSI_COLOR_RESET );
 			}
 
       dbg->debug_callback( (void*)aafi, DEBUG_SRC_ID_DUMP, 0, "", "", 0, dbg->_dbg_msg, dbg->user );
@@ -265,6 +253,9 @@ static void xplore_StrongObjectReferenceVector( AAF_Iface *aafi, aafObject *ObjC
 			free( name );
 		}
 		else {
+      dbg->debug_callback( (void*)aafi, DEBUG_SRC_ID_DUMP, 0, "", "", 0, dbg->_dbg_msg, dbg->user );
+
+      offset = 0;
 			aaf_dump_ObjectProperties( aafi->aafd, Obj );
 		}
 	}
@@ -475,6 +466,10 @@ void _DUMP_OBJ( AAF_Iface *aafi, aafObject *Obj, struct trace_dump *__td, int st
 			offset += snprintf_realloc( &dbg->_dbg_msg, &dbg->_dbg_msg_size, offset, "Properties Dump (%ls)\n", aaf_get_ObjectPath( Obj ) );
 			offset += snprintf_realloc( &dbg->_dbg_msg, &dbg->_dbg_msg_size, offset, "===============\n\n" );
 			// aaf_dump_nodeStreamProperties( aafi->aafd, Obj->Node );
+
+      dbg->debug_callback( (void*)aafi, DEBUG_SRC_ID_TRACE, 0, "", "", 0, dbg->_dbg_msg, dbg->user );
+
+      offset = 0;
 			aaf_dump_ObjectProperties( aafi->aafd, Obj );
 		}
 		else {
@@ -606,36 +601,36 @@ static wchar_t * build_unique_audiofilename( AAF_Iface *aafi, aafiAudioEssence *
 
 	aafiAudioEssence *ae = NULL;
 
-	if ( 1 )
-	{
-		size_t i = 0;
-
-		for ( ; i < file_name_len; i++ )
-		{
-			/* if char is out of the Basic Latin range */
-			if ( unique[i] > 0xff )
-			{
-				// debug( "MobID : %ls", MobIDToText( audioEssence->sourceMobID ) );
-				aafUID_t *uuid = &(audioEssence->sourceMobID->material);
-				swprintf( unique, 1024, L"%08x-%04x-%04x-%02x%02x%02x%02x%02x%02x%02x%02x",
-					uuid->Data1,
-					uuid->Data2,
-					uuid->Data3,
-					uuid->Data4[0],
-				 	uuid->Data4[1],
-					uuid->Data4[2],
-					uuid->Data4[3],
-					uuid->Data4[4],
-					uuid->Data4[5],
-					uuid->Data4[6],
-					uuid->Data4[7] );
-
-				audioEssence->unique_file_name = unique;
-
-				return unique;
-			}
-		}
-	}
+	// if ( 1 )
+	// {
+	// 	size_t i = 0;
+  //
+	// 	for ( ; i < file_name_len; i++ )
+	// 	{
+	// 		/* if char is out of the Basic Latin range */
+	// 		if ( unique[i] > 0xff )
+	// 		{
+	// 			// debug( "MobID : %ls", MobIDToText( audioEssence->sourceMobID ) );
+	// 			aafUID_t *uuid = &(audioEssence->sourceMobID->material);
+	// 			swprintf( unique, 1024, L"%08x-%04x-%04x-%02x%02x%02x%02x%02x%02x%02x%02x",
+	// 				uuid->Data1,
+	// 				uuid->Data2,
+	// 				uuid->Data3,
+	// 				uuid->Data4[0],
+	// 			 	uuid->Data4[1],
+	// 				uuid->Data4[2],
+	// 				uuid->Data4[3],
+	// 				uuid->Data4[4],
+	// 				uuid->Data4[5],
+	// 				uuid->Data4[6],
+	// 				uuid->Data4[7] );
+  //
+	// 			audioEssence->unique_file_name = unique;
+  //
+	// 			return unique;
+	// 		}
+	// 	}
+	// }
 
 
 	int id = 0;
@@ -2106,9 +2101,13 @@ static int parse_Timecode( AAF_Iface *aafi, aafObject *Timecode, td *__ptd )
 	}
 
 
+  if ( aafi->Timecode ) {
+    DUMP_OBJ_WARNING( aafi, Timecode, &__td, "Timecode was already set, ignoring (%lu, %u fps)", *tc_start, *tc_fps );
+    return -1;
+  }
 	/* TODO allocate in specific function */
 
-	aafiTimecode *tc = calloc( sizeof(aafiTimecode), sizeof(unsigned char) );
+  aafiTimecode *tc = calloc( sizeof(aafiTimecode), sizeof(unsigned char) );
 
 	if ( tc == NULL )
 	{
@@ -2121,8 +2120,7 @@ static int parse_Timecode( AAF_Iface *aafi, aafObject *Timecode, td *__ptd )
 	tc->drop  = *tc_drop;
 	tc->edit_rate = tc_edit_rate;
 
-	aafi->Audio->tc = tc;
-	aafi->Video->tc = tc; // TODO do it properly !
+  aafi->Timecode = tc;
 
 
 	DUMP_OBJ( aafi, Timecode, &__td );
@@ -3698,11 +3696,11 @@ static int parse_ConstantValue( AAF_Iface *aafi, aafObject *ConstantValue, td *_
        aafUIDCmp( ParamDef, &AAFParameterDef_Amplitude ) )
 	{
 
-		aafRational_t *multiplier = aaf_get_propertyIndirectValue( ConstantValue, PID_ConstantValue_Value );
+		aafRational_t *multiplier = aaf_get_propertyIndirectValue( ConstantValue, PID_ConstantValue_Value, &AAFTypeID_Rational );
 
 		if ( multiplier == NULL )
 		{
-			DUMP_OBJ_ERROR( aafi, ConstantValue, &__td, "Missing PID_ConstantValue_Value" );
+			DUMP_OBJ_ERROR( aafi, ConstantValue, &__td, "Missing PID_ConstantValue_Value or wrong AAFTypeID" );
 			return -1;
 		}
 
@@ -3777,11 +3775,11 @@ static int parse_ConstantValue( AAF_Iface *aafi, aafObject *ConstantValue, td *_
 		 *	from its native representation when exporting and importing the composition.
 		 */
 
-		aafRational_t *multiplier = aaf_get_propertyIndirectValue( ConstantValue, PID_ConstantValue_Value );
+		aafRational_t *multiplier = aaf_get_propertyIndirectValue( ConstantValue, PID_ConstantValue_Value, &AAFTypeID_Rational );
 
  		if ( multiplier == NULL )
  		{
- 			DUMP_OBJ_ERROR( aafi, ConstantValue, &__td, "Missing PID_ConstantValue_Value" );
+ 			DUMP_OBJ_ERROR( aafi, ConstantValue, &__td, "Missing PID_ConstantValue_Value or wrong AAFTypeID" );
  			return -1;
  		}
 
@@ -4099,7 +4097,7 @@ static int retrieve_ControlPoints( AAF_Iface *aafi, aafObject *Points, aafRation
 
 	aafObject *Point  = NULL;
 
-	uint i = 0;
+	unsigned int i = 0;
 
 	aaf_foreach_ObjectInSet( &Point, Points, &AAFClassID_ControlPoint )
 	{
@@ -4118,12 +4116,12 @@ static int retrieve_ControlPoints( AAF_Iface *aafi, aafObject *Points, aafRation
 		}
 
 
-		aafRational_t *value = aaf_get_propertyIndirectValue( Point, PID_ControlPoint_Value );
+		aafRational_t *value = aaf_get_propertyIndirectValue( Point, PID_ControlPoint_Value,&AAFTypeID_Rational );
 
 		if ( value == NULL )
 		{
 			// trace_obj( aafi, Points, ANSI_COLOR_RED );
-			error( "Missing ControlPoint::Value." );
+			error( "Missing ControlPoint::Value or wrong AAFTypeID" );
 
 			free( times );  *times  = NULL;
 			free( values ); *values = NULL;
@@ -4279,7 +4277,7 @@ static int parse_CompositionMob( AAF_Iface *aafi, aafObject *CompoMob, td *__ptd
 		}
 
 
-		wchar_t *text = aaf_get_propertyIndirectValueWstr( UserComment, PID_TaggedValue_Value );
+		wchar_t *text = aaf_get_propertyIndirectValue( UserComment, PID_TaggedValue_Value, &AAFTypeID_String );
 
 		if ( text == NULL ) /* req */
 		{
@@ -4762,8 +4760,11 @@ static int parse_MobSlot( AAF_Iface *aafi, aafObject *MobSlot, td *__ptd )
 
 	/* TODO implement global (audio and video) session start and end */
 	// if ( aafi->ctx.current_tree_type == AAFI_TREE_TYPE_AUDIO )
-	  if ( session_end > 0 && aafi->Audio->tc && aafi->Audio->tc->end < session_end )
-	      aafi->Audio->tc->end = session_end;
+
+  if ( session_end > 0 && aafi->Timecode && aafi->Timecode->end < session_end ) {
+    aafi->Timecode->end = session_end;
+  }
+
 	// if ( aafi->ctx.current_tree_type == AAFI_TREE_TYPE_VIDEO )
 	//   if ( session_end > 0 && aafi->Video->tc )
 	//       aafi->Video->tc->end = session_end;
@@ -4961,9 +4962,29 @@ int aafi_retrieveData( AAF_Iface *aafi )
 	// 	}
 	// }
 
+  if ( aafi->Timecode == NULL ) {
+    warning( "No timecode found in file. Setting to 00:00:00:00 @ 25fps" );
+
+    aafiTimecode *tc = calloc( sizeof(aafiTimecode), sizeof(unsigned char) );
+
+  	if ( tc == NULL )
+  	{
+  		error( "calloc() : %s", strerror( errno ) );
+  		return -1;
+  	}
+
+  	tc->start = 0;
+  	tc->fps   = 25;
+  	tc->drop  = 0;
+  	tc->edit_rate = &AAFI_DEFAULT_TC_EDIT_RATE;
+
+    aafi->Timecode = tc;
+  }
+
   /* aafi->Audio->tc->end is set to composition duration. Add tc->start to set composition end time */
-  if ( aafi->Audio->tc && aafi->Audio->tc->end ) {
-    aafi->Audio->tc->end += aafi->Audio->tc->start;
+
+  if ( aafi->Timecode && aafi->Timecode->end ) {
+    aafi->Timecode->end += aafi->Timecode->start;
   }
 
 
@@ -5046,30 +5067,9 @@ int aafi_retrieveData( AAF_Iface *aafi )
 
 
 
-	if ( aafi->Audio->tc && !aafi->Video->tc ) {
-		aafi->compositionStart = aafi->Audio->tc->start;
-		aafi->compositionStart_editRate.numerator   = aafi->Audio->tc->edit_rate->numerator;
-		aafi->compositionStart_editRate.denominator = aafi->Audio->tc->edit_rate->denominator;
-	}
-	else
-	if ( !aafi->Audio->tc && aafi->Video->tc ) {
-		aafi->compositionStart = aafi->Video->tc->start;
-		aafi->compositionStart_editRate.numerator   = aafi->Video->tc->edit_rate->numerator;
-		aafi->compositionStart_editRate.denominator = aafi->Video->tc->edit_rate->denominator;
-	}
-	else
-	if ( aafi->Audio->tc && aafi->Video->tc ) {
-		if ( aafi->Audio->tc->start > aafi->Video->tc->start ) {
-			aafi->compositionStart = aafi->Audio->tc->start;
-			aafi->compositionStart_editRate.numerator   = aafi->Audio->tc->edit_rate->numerator;
-			aafi->compositionStart_editRate.denominator = aafi->Audio->tc->edit_rate->denominator;
-		}
-		else {
-			aafi->compositionStart = aafi->Video->tc->start;
-			aafi->compositionStart_editRate.numerator   = aafi->Video->tc->edit_rate->numerator;
-			aafi->compositionStart_editRate.denominator = aafi->Video->tc->edit_rate->denominator;
-		}
-	}
+  aafi->compositionStart = aafi->Timecode->start;
+  aafi->compositionStart_editRate.numerator   = aafi->Timecode->edit_rate->numerator;
+  aafi->compositionStart_editRate.denominator = aafi->Timecode->edit_rate->denominator;
 
 
 	if ( protools_AAF( aafi ) ) {

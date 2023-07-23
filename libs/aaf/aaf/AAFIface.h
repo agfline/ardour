@@ -477,7 +477,7 @@ typedef struct aafiTimelineItem
 
 
 /**
- *	Used by aafiAudio.tc and aafiAudioTrack.tc.
+ * 
  */
 
 typedef struct aafiTimecode
@@ -672,8 +672,6 @@ typedef struct aafiAudio
 	 *	Holds the sequence start timecode.
 	 */
 
-	aafiTimecode     *tc;
-
 	aafPosition_t     start;
 	aafPosition_t     length;
 	aafRational_t     length_editRate;
@@ -703,8 +701,6 @@ typedef struct aafiVideo
 	/**
 	 *	Holds the sequence start timecode.
 	 */
-
-	aafiTimecode     *tc;
 
 	aafPosition_t     start;
 	aafPosition_t     length;
@@ -861,18 +857,21 @@ typedef struct AAF_Iface
 	 *	Keeps track of the AAF_Data structure.
 	 */
 
-	AAF_Data   *aafd;
+	AAF_Data     *aafd;
 
-	aafiAudio  *Audio;
 
-	aafiVideo  *Video;
+	aafiAudio    *Audio;
 
-	aafiMarker *Markers;
+	aafiVideo    *Video;
+
+	aafiTimecode *Timecode;
+
+	aafiMarker   *Markers;
 
 
 	wchar_t          *compositionName;
 
-	aafPosition_t     compositionStart; // aafi->Audio->tc->start  OR IF UNDEFINED  aafi->Video->tc->start
+	aafPosition_t     compositionStart; // set from aafi->Timecode->start
 	aafRational_t     compositionStart_editRate;
 
 	aafPosition_t     compositionLength;
@@ -947,28 +946,6 @@ typedef struct AAF_Iface
     eu2sample( audioClip->Essence->samplerate, audioClip->track->edit_rate, val )
 // 	(int64_t)(val * (audioClip->Essence->samplerate * (1 / aafRationalToFloat(audioClip->track->edit_rate))))
 
-/*
-#define eu2tc_h( edit_rate, val ) \
-	(uint16_t)((val * (1 / aafRationalToFloat(edit_rate))) / 3600)
-
-#define eu2tc_m( edit_rate, val ) \
-	(uint16_t)((int64_t)(val * (1 / aafRationalToFloat(edit_rate))) % 3600 / 60)
-
-#define eu2tc_s( edit_rate, val ) \
-	(uint16_t)((int64_t)(val * (1 / aafRationalToFloat(edit_rate))) % 3600 % 60)
-
-#define eu2tc_f( edit_rate, tc, val ) \
-	(uint16_t)(((int64_t)(val * (1 / aafRationalToFloat(edit_rate))) % tc->fps) * tc->fps)
-*/
-
-
-
-
-/*
-#define foreachAudioClip( ac, acList ) \
-	for ( ac = acList; ac != NULL; ac = ac->next )
-*/
-
 
 
 
@@ -980,6 +957,8 @@ void aafi_set_debug( AAF_Iface *aafi, verbosityLevel_e v );
 AAF_Iface * aafi_alloc( AAF_Data *aafd );
 
 int aafi_set_media_location( AAF_Iface *aafi, const char *path );
+
+int aafi_set_trace_class( AAF_Iface *aafi, const char *className );
 
 void aafi_release( AAF_Iface **aafi );
 

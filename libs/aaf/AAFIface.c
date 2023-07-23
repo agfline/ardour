@@ -88,7 +88,7 @@ AAF_Iface * aafi_alloc( AAF_Data *aafd )
 	}
 
 
-	aafi->Audio = malloc( sizeof(aafiAudio) );
+	aafi->Audio = calloc( sizeof(aafiAudio), sizeof(unsigned char) );
 
 	if ( aafi->Audio == NULL )
 	{
@@ -97,7 +97,6 @@ AAF_Iface * aafi_alloc( AAF_Data *aafd )
 	}
 
 	aafi->Audio->Essences = NULL;
-	aafi->Audio->tc = NULL;
 	aafi->Audio->samplerate = 0;
 	aafi->Audio->samplesize = 0;
 	aafi->Audio->Tracks = NULL;
@@ -105,7 +104,7 @@ AAF_Iface * aafi_alloc( AAF_Data *aafd )
 	aafi->Audio->length = 0;
 
 
-	aafi->Video = malloc( sizeof(aafiVideo) );
+	aafi->Video = calloc( sizeof(aafiVideo), sizeof(unsigned char) );
 
 	if ( aafi->Video == NULL )
 	{
@@ -114,7 +113,6 @@ AAF_Iface * aafi_alloc( AAF_Data *aafd )
 	}
 
 	aafi->Video->Essences = NULL;
-	aafi->Video->tc = NULL;
 	aafi->Video->Tracks = NULL;
 	aafi->Video->length = 0;
 
@@ -155,12 +153,14 @@ AAF_Iface * aafi_alloc( AAF_Data *aafd )
 }
 
 
+
 void aafi_set_debug( AAF_Iface *aafi, verbosityLevel_e v ) {
 	// aafi->verb = v;
 	// aafi->aafd->verb = v;
 	// aafi->aafd->cfbd->verb = v;
 	aafi->dbg->verb = v;
 }
+
 
 
 int aafi_set_media_location( AAF_Iface *aafi, const char *path ) {
@@ -170,6 +170,26 @@ int aafi_set_media_location( AAF_Iface *aafi, const char *path ) {
 	}
 
 	aafi->ctx.options.media_location = (path) ? c99strdup( path ) : NULL;
+
+	return 0;
+}
+
+
+
+int aafi_set_trace_class( AAF_Iface *aafi, const char *className ) {
+
+	if ( aafi->ctx.options.trace_class ) {
+		free( aafi->ctx.options.trace_class );
+		aafi->ctx.options.trace_class = NULL;
+	}
+
+	aafi->ctx.options.trace_class = malloc( (strlen(className)+1)*sizeof(wchar_t) );
+
+	if ( aafi->ctx.options.trace_class == NULL ) {
+		return -1;
+	}
+
+	swprintf( aafi->ctx.options.trace_class, strlen(className)+1, L"%" WPRIs, className );
 
 	return 0;
 }
@@ -210,11 +230,6 @@ void aafi_release( AAF_Iface **aafi )
 			aafi_freeAudioEssences( &(*aafi)->Audio->Essences );
 		}
 
-		if ( (*aafi)->Audio->tc != NULL )
-		{
-			free( (*aafi)->Audio->tc );
-		}
-
 		free( (*aafi)->Audio );
 	}
 
@@ -232,11 +247,6 @@ void aafi_release( AAF_Iface **aafi )
 			aafi_freeVideoEssences( &(*aafi)->Video->Essences );
 		}
 
-		if ( (*aafi)->Video->tc != NULL )
-		{
-			// free( (*aafi)->Video->tc );
-		}
-
 		free( (*aafi)->Video );
 	}
 
@@ -252,6 +262,10 @@ void aafi_release( AAF_Iface **aafi )
 		free( (*aafi)->ctx.options.media_location );
 	}
 
+
+	if ( (*aafi)->Timecode != NULL ) {
+		free( (*aafi)->Timecode );
+	}
 
 	if ( (*aafi)->dbg ) {
 		free_debug( (*aafi)->dbg );

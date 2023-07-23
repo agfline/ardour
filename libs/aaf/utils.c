@@ -32,142 +32,142 @@
 
 
 
-wchar_t * utoa( wchar_t *str )
-{
-  /*
-   * Unicode to ASCII
-   */
-
-  for ( size_t i = 0; str[i]; i++ ) {
-    wchar_t c = str[i];
-    // printf("0x%02x\n", c );
-
-    switch ( c ) {
-
-      case L'à':
-      case L'á':
-      case L'â':
-      case L'ã':
-      case L'ä':
-      case L'å':
-      case L'æ':
-        str[i] = 'a';
-        break;
-
-      case L'é':
-      case L'è':
-      case L'ê':
-      case L'ë':
-        str[i] = 'e';
-        break;
-
-      case L'ì':
-      case L'í':
-      case L'î':
-      case L'ï':
-        str[i] = 'i';
-        break;
-
-      case L'ò':
-      case L'ó':
-      case L'ô':
-      case L'õ':
-      case L'ö':
-      case L'ø':
-      case L'œ':
-        str[i] = 'o';
-        break;
-
-      case L'ù':
-      case L'ú':
-      case L'û':
-      case L'ü':
-        str[i] = 'u';
-        break;
-
-      case L'ý':
-      case L'ÿ':
-        str[i] = 'y';
-        break;
-
-      case L'À':
-      case L'Á':
-      case L'Â':
-      case L'Ã':
-      case L'Ä':
-      case L'Å':
-      case L'Æ':
-        str[i] = 'A';
-        break;
-
-      case L'È':
-      case L'É':
-      case L'Ê':
-      case L'Ë':
-        str[i] = 'E';
-        break;
-
-      case L'Ì':
-      case L'Í':
-      case L'Î':
-      case L'Ï':
-        str[i] = 'I';
-        break;
-
-      case L'Ò':
-      case L'Ó':
-      case L'Ô':
-      case L'Õ':
-      case L'Ö':
-      case L'Ø':
-      case L'Œ':
-        str[i] = 'O';
-        break;
-
-      case L'Ù':
-      case L'Ú':
-      case L'Û':
-      case L'Ü':
-        str[i] = 'U';
-        break;
-
-      case L'Ý':
-      case L'Ÿ':
-        str[i] = 'Y';
-        break;
-
-      case L'ç':
-        str[i] = 'c';
-        break;
-
-      case L'Ç':
-        str[i] = 'C';
-        break;
-
-      case L'ð':
-        str[i] = 'd';
-        break;
-
-      case L'Ð':
-        str[i] = 'D';
-        break;
-
-      case L'ß':
-        str[i] = 'S';
-        break;
-
-      case L'¿':
-        str[i] = '?';
-        break;
-
-      case L'¡':
-        str[i] = '!';
-        break;
-    }
-  }
-
-  return str;
-}
+// wchar_t * utoa( wchar_t *str )
+// {
+//   /*
+//    * Unicode to ASCII
+//    */
+//
+//   for ( size_t i = 0; str[i]; i++ ) {
+//     wchar_t c = str[i];
+//     // printf("0x%02x\n", c );
+//
+//     switch ( c ) {
+//
+//       case L'à':
+//       case L'á':
+//       case L'â':
+//       case L'ã':
+//       case L'ä':
+//       case L'å':
+//       case L'æ':
+//         str[i] = 'a';
+//         break;
+//
+//       case L'é':
+//       case L'è':
+//       case L'ê':
+//       case L'ë':
+//         str[i] = 'e';
+//         break;
+//
+//       case L'ì':
+//       case L'í':
+//       case L'î':
+//       case L'ï':
+//         str[i] = 'i';
+//         break;
+//
+//       case L'ò':
+//       case L'ó':
+//       case L'ô':
+//       case L'õ':
+//       case L'ö':
+//       case L'ø':
+//       case L'œ':
+//         str[i] = 'o';
+//         break;
+//
+//       case L'ù':
+//       case L'ú':
+//       case L'û':
+//       case L'ü':
+//         str[i] = 'u';
+//         break;
+//
+//       case L'ý':
+//       case L'ÿ':
+//         str[i] = 'y';
+//         break;
+//
+//       case L'À':
+//       case L'Á':
+//       case L'Â':
+//       case L'Ã':
+//       case L'Ä':
+//       case L'Å':
+//       case L'Æ':
+//         str[i] = 'A';
+//         break;
+//
+//       case L'È':
+//       case L'É':
+//       case L'Ê':
+//       case L'Ë':
+//         str[i] = 'E';
+//         break;
+//
+//       case L'Ì':
+//       case L'Í':
+//       case L'Î':
+//       case L'Ï':
+//         str[i] = 'I';
+//         break;
+//
+//       case L'Ò':
+//       case L'Ó':
+//       case L'Ô':
+//       case L'Õ':
+//       case L'Ö':
+//       case L'Ø':
+//       case L'Œ':
+//         str[i] = 'O';
+//         break;
+//
+//       case L'Ù':
+//       case L'Ú':
+//       case L'Û':
+//       case L'Ü':
+//         str[i] = 'U';
+//         break;
+//
+//       case L'Ý':
+//       case L'Ÿ':
+//         str[i] = 'Y';
+//         break;
+//
+//       case L'ç':
+//         str[i] = 'c';
+//         break;
+//
+//       case L'Ç':
+//         str[i] = 'C';
+//         break;
+//
+//       case L'ð':
+//         str[i] = 'd';
+//         break;
+//
+//       case L'Ð':
+//         str[i] = 'D';
+//         break;
+//
+//       case L'ß':
+//         str[i] = 'S';
+//         break;
+//
+//       case L'¿':
+//         str[i] = '?';
+//         break;
+//
+//       case L'¡':
+//         str[i] = '!';
+//         break;
+//     }
+//   }
+//
+//   return str;
+// }
 
 
 
@@ -338,6 +338,7 @@ int snprintf_realloc( char **str, int *size, size_t offset, const char *format, 
 }
 
 
+
 int vsnprintf_realloc( char **str, int *size, int offset, const char *fmt, va_list *args )
 {
   va_list args2, args3;
@@ -398,53 +399,6 @@ char * c99strdup( const char *src )
 
 
 
-size_t utf16toa( char *astr, uint16_t alen, uint16_t *wstr, uint16_t wlen )
-{
-     uint32_t i = 0;
-
-     /*
-      *  Remove the leading byte in SF_DATA_STREAM if strlen is odd
-      *  -> /Header-2/EssenceData-1902/properties -> PID_EssenceData_Data : Data-2702
-      *
-      *  TODO What is that leading byte doing here ???? -> 0x55 (U)
-      */
-
-     if ( wlen % 2 )
-     {
-         wstr = (uint16_t*)((char*)wstr + 1);
-         wlen--;
-     }
-
-     uint16_t len = (wlen >> 1);
-
-     for ( i = 0; (i < len && i < alen); i++ )
-         astr[i] = (char)wstr[i];
-
-
-     astr[--i] = 0x00;
-
-     return i;
-}
-
-
-
-wchar_t * atowchar( const char *astr, uint16_t alen )
-{
-	uint16_t i = 0;
-
-	wchar_t *wstr = calloc( alen+1, sizeof(wchar_t) );
-
-	for ( i = 0; i < alen; i++ )
-		wstr[i] = (wchar_t)astr[i];
-
-
-//	wstr[--i] = 0x0000;
-
-	return wstr;
-}
-
-
-
 /* https://stackoverflow.com/questions/2736753/how-to-remove-extension-from-file-name */
 char *remove_file_ext (char* myStr, char extSep, char pathSep)
 {
@@ -482,20 +436,6 @@ char *remove_file_ext (char* myStr, char extSep, char pathSep)
     // Return the modified string.
 
     return retStr;
-}
-
-
-
-wchar_t * w16tow32( wchar_t *w32buf, uint16_t *w16buf, size_t w16len )
-{
-    size_t i = 0;
-
-    for ( i = 0; i < w16len/2; i++ )
-    {
-        w32buf[i] = ((uint16_t*)w16buf)[i];
-    }
-
-    return w32buf;
 }
 
 

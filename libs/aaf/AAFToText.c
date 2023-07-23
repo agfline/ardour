@@ -21,11 +21,6 @@
 #include <stdio.h>
 #include <wchar.h>
 
-#include "aaf/AAFToText.h"
-#include "aaf/AAFTypes.h"
-#include "aaf/AAFClass.h"
-#include "aaf/utils.h"
-
 #include "aaf/AAFDefs/AAFClassDefUIDs.h"
 #include "aaf/AAFDefs/AAFPropertyIDs.h"
 #include "aaf/AAFDefs/AAFCompressionDefs.h"
@@ -39,13 +34,11 @@
 #include "aaf/AAFDefs/AAFOPDefs.h"
 #include "aaf/AAFDefs/AAFContainerDefs.h"
 
-#ifdef _WIN32
-  #define WPRIs  L"S" // char*
-	#define WPRIws L"s" // wchar_t*
-#else
-  #define WPRIs  L"s"  // char*
-	#define WPRIws L"ls" // wchar_t*
-#endif
+#include "aaf/AAFToText.h"
+#include "aaf/AAFTypes.h"
+
+#include "aaf/AAFClass.h"
+#include "aaf/utils.h"
 
 
 

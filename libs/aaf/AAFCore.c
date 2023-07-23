@@ -39,13 +39,6 @@
 
 #include "aaf/utils.h"
 
-#ifdef _WIN32
-  #define WPRIs  L"S" // char*
-	#define WPRIws L"s" // wchar_t*
-#else
-  #define WPRIs  L"s"  // char*
-	#define WPRIws L"ls" // wchar_t*
-#endif
 
 
 #define debug( ... ) \
@@ -646,64 +639,25 @@ void aaf_release( AAF_Data **aafd )
 
 wchar_t * aaf_get_ObjectPath( aafObject *Obj )
 {
-	// char *path = calloc( CFB_PATH_NAME_SZ, sizeof(char) );
-    //
-	// if ( path == NULL )
-	// {
-	// 	error( "%s.", strerror( errno ) );
-	// 	return NULL;
-	// }
-
 	static wchar_t path[CFB_PATH_NAME_SZ];
 
-	// memset( path, 0x00, CFB_PATH_NAME_SZ );
-
-	// path[CFB_PATH_NAME_SZ-1] = 0x0000;
-
-	// path[0] = '\0';
-	// memset( path, 0x00, CFB_PATH_NAME_SZ );
-
-
-	uint32_t offset  = CFB_PATH_NAME_SZ;
-	// uint32_t pathLen = 0;
+	uint32_t offset = CFB_PATH_NAME_SZ;
+  path[--offset] = 0x0000; // NULL terminating byte
 
 	while ( Obj != NULL )
 	{
-		offset -= wcslen(Obj->Name)+1;	// +1 = room for '/'
-		memcpy( ((unsigned char*)path)+(offset * sizeof(wchar_t)), (unsigned char*)Obj->Name, (wcslen(Obj->Name)) * sizeof(wchar_t) );
+    for ( int i = wcslen(Obj->Name)-1; i >= 0 && offset > 0; i-- ) {
+      path[--offset] = Obj->Name[i];
+    }
 
-		path[offset+wcslen(Obj->Name)] = '/';
-		// memcpy(void *restrict __dest, const void *restrict __src, size_t __n)
+    if ( offset == 0 )
+      break;
 
-	// 	offset  = wcslen( Obj->Name );
-	// 	pathLen = wcslen(    path   );
-    //
-	// 	if ( offset + pathLen + 1 > CFB_PATH_NAME_SZ )
-	// 	{
-	// 		error( "Retrieved path length is bigger than CFB_PATH_NAME_SZ." );
-	// 		return NULL;
-	// 	}
-    //
-	// 	// if ( pathLen > 0 )
-	// 	memcpy( path+(++offset), path, pathLen+1 ); // +1 for \0
-    //
-	// 	memcpy( path, Obj->Name, offset );
-    //
-	// 	if ( pathLen > 0 )
-	// 		path[offset-1] = '/';
-    //
-    //
+    path[--offset] = '/';
+
 		Obj = Obj->Parent;
 	}
 
-	path[CFB_PATH_NAME_SZ-1] = 0x0000; // NULL terminating byte
-
-	path[--offset] = '/'; // path string leading slash
-
-	// path[pathLen+offset] = '\0';
-
-	// dump_hex( path, CFB_PATH_NAME_SZ * 4 );
-	// exit(1);
 	return path + offset;
 }
 
@@ -885,143 +839,85 @@ void * aaf_get_propertyValue( aafObject *Obj, aafPID_t pid )
 }
 
 
-/*
-char * aaf_get_propertyValueText( aafObject *Obj, aafPID_t pid )
-{
-	aafProperty *Prop = aaf_get_property( Obj, pid );
-
-	if ( Prop == NULL )
-	{
-		return NULL;
-	}
-
-	char *string  = malloc( ( Prop->len >> 1 ) + 1 );
-
-	utf16toa( string, (Prop->len >> 1) + 1, Prop->val, Prop->len );
-
-
-	return string;
-}
-*/
-
 
 wchar_t * aaf_get_propertyValueWstr( aafObject *Obj, aafPID_t pid )
 {
-	aafProperty *Prop = aaf_get_property( Obj, pid );
+  AAF_Data *aafd = Obj->aafd;
+  aafProperty *Prop = aaf_get_property( Obj, pid );
 
-	if ( Prop == NULL )
-	{
-		return NULL;
-	}
+  if ( Prop == NULL ) {
+    error( "Could not retrieve property with PID %i", pid );
+  	return NULL;
+  }
 
-	wchar_t *string  = malloc( ( Prop->len >> 1 ) * sizeof(wchar_t) );
+  uint16_t *val = Prop->val;
+  uint16_t len = Prop->len;
 
-	/*
-	 *  Remove the leading byte in SF_DATA_STREAM if strlen is odd
-	 *  -> PID_EssenceData_Data : Data-2702
-	 *
-	 *  TODO What is that leading byte doing here ???? -> 0x55 (U)
-	 */
+  if ( Prop->sf == SF_DATA_STREAM ) {
+    /*
+     * DATA_STREAM stored form starts with a byte identifying byte order : 0x4c, 0x42, 0x55
+     * we must skip that byte
+     */
+    val = (uint16_t*)(((char*)val) + 1);
+    len--;
+  }
 
-#ifdef _WIN32
-	memcpy( string,
-		( Prop->len % 2 ) ? (char*)Prop->val+1 : Prop->val,
-		( Prop->len % 2 ) ? Prop->len-1 : Prop->len );
-#else
-	w16tow32( string,
-		( Prop->len % 2 ) ? (char*)Prop->val+1 : Prop->val,
-		( Prop->len % 2 ) ? Prop->len-1 : Prop->len );
-#endif
+  wchar_t *string = cfb_w16towchar( NULL, val, len );
 
-	// w16tow32( string, Prop->val, Prop->len );
-
-
-	return string;
+  return string;
 }
 
 
 
-void * aaf_get_propertyIndirectValue( aafObject *Obj, aafPID_t pid )
+aafIndirect_t * aaf_get_propertyIndirect( aafObject *Obj, aafPID_t pid, const aafUID_t *typeDef )
 {
-	aafIndirect_t *Indirect = (aafIndirect_t*)(((unsigned char*)aaf_get_propertyValue( Obj, pid ))+1); // +1 offset allows to skip aafIndirect_t->unknownByte while maintaining memory aligned
+  AAF_Data *aafd = Obj->aafd;
+  aafProperty *Prop = aaf_get_property( Obj, pid );
 
-	if ( Indirect == NULL )
-	{
-		return NULL;
-	}
+  if ( Prop == NULL ) {
+    error( "Could not retrieve IndirectValue property with PID %i", pid );
+    return NULL;
+  }
 
-	// TODO ? ensures the Indirect->Value is what it pretend to be by size check.
+  if ( Prop->sf != SF_DATA ) {
+    error( "Property PID %i should contain an IndirectValue but is not SF_DATA", pid );
+    return NULL;
+  }
 
-	return Indirect->Value;
+  /*
+   * IndirectValue starts with a byte identifying byte order : 0x4c, 0x42, 0x55
+   * we must skip that byte
+   */
+
+  aafIndirect_t *Indirect = (aafIndirect_t*)(((unsigned char*)Prop->val)+1);
+
+  if ( aafUIDCmp( &Indirect->TypeDef, typeDef ) != 0 && aafUIDCmp( &Indirect->TypeDef, &AUID_NULL ) != 0 ) {
+    error( "Requested IndirectValue in PID %i of type %ls but has type %ls", pid, TypeIDToText(typeDef), TypeIDToText(&Indirect->TypeDef) );
+    return NULL;
+  }
+
+  return (aafIndirect_t*)Indirect;
 }
 
 
 
-aafUID_t * aaf_get_propertyIndirectValueType( aafObject *Obj, aafPID_t pid )
+void * aaf_get_propertyIndirectValue( aafObject *Obj, aafPID_t pid, const aafUID_t *typeDef )
 {
-	aafIndirect_t *Indirect = (aafIndirect_t*)(((unsigned char*)aaf_get_propertyValue( Obj, pid ))+1); // +1 offset allows to skip aafIndirect_t->unknownByte while maintaining memory aligned
+  AAF_Data *aafd = Obj->aafd;
+  aafIndirect_t *Indirect = aaf_get_propertyIndirect( Obj, pid, typeDef );
 
-	if ( Indirect == NULL )
-	{
-		return NULL;
-	}
+  if ( Indirect == NULL ) {
+    error( "Could not retrieve IndirectValue" );
+  	return NULL;
+  }
 
-	// TODO ? ensures the Indirect->Value is what it pretend to be by size check.
+  if ( aafUIDCmp( typeDef, &AAFTypeID_String ) ) {
+    aafProperty *Prop = aaf_get_property( Obj, pid );
+    return cfb_w16towchar( NULL, (uint16_t*)Indirect->Value, (Prop->len - 1 - sizeof(aafIndirect_t)) );
+  }
 
-	return &Indirect->TypeDef;
+  return &Indirect->Value;
 }
-
-
-
-wchar_t * aaf_get_propertyIndirectValueWstr( aafObject *Obj, aafPID_t pid )
-{
-  AAF_Data *aafd = Obj->aafd; // used for debug()
-
-	aafProperty *Prop = aaf_get_property( Obj, pid );
-
-	if ( Prop == NULL )
-	{
-		return NULL;
-	}
-
-	aafIndirect_t *Indirect = (aafIndirect_t*)(((unsigned char*)Prop->val)+1); // +1 offset allows to skip aafIndirect_t->unknownByte while maintaining memory aligned
-
-	if ( aafUIDCmp( &Indirect->TypeDef, &AAFTypeID_String ) == 0 )
-	{
-		warning( "Indirect value is not of type String but of type %ls.", TypeIDToText( &Indirect->TypeDef ) );
-		return NULL;
-	}
-
-	wchar_t *string  = malloc( (( Prop->len - sizeof(aafIndirect_t)) >> 1 ) * sizeof(wchar_t) );
-
-	// utf16toa( string, ((Prop->len - sizeof(aafIndirect_t)) >> 1) + 1, (uint16_t*)Indirect->Value, (Prop->len - sizeof(aafIndirect_t)) );
-	// utf16toa(char *astr, uint16_t alen, uint16_t *wstr, uint16_t wlen)
-
-#ifdef _WIN32
-	memcpy( string, Indirect->Value, (Prop->len - sizeof(aafIndirect_t)) );
-#else
-	w16tow32( string, (uint16_t*)Indirect->Value, (Prop->len - sizeof(aafIndirect_t)) );
-#endif
-
-	return string;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -1060,14 +956,7 @@ static aafObject * newObject( AAF_Data *aafd, cfbNode *Node, aafClass *Class, aa
 		return NULL;
 	}
 
-
-	// utf16toa( Obj->Name, CFB_NODE_NAME_SZ, Node->_ab, Node->_cb );
-
-#ifdef _WIN32
-	memcpy( Obj->Name, Node->_ab, Node->_cb );
-#else
-	w16tow32( Obj->Name, Node->_ab, Node->_cb );
-#endif
+  cfb_w16towchar( Obj->Name, Node->_ab, Node->_cb );
 
 	Obj->aafd       = aafd;
 	Obj->Class      = Class;
@@ -1753,13 +1642,7 @@ static int retrieveStrongReference( AAF_Data *aafd, aafProperty *Prop, aafObject
 {
 	wchar_t name[CFB_NODE_NAME_SZ];
 
-	// utf16toa( name, CFB_NODE_NAME_SZ, Prop->val, Prop->len );
-
-#ifdef _WIN32
-	memcpy( name, Prop->val, Prop->len );
-#else
-	w16tow32( name, Prop->val, Prop->len );
-#endif
+  cfb_w16towchar( name, Prop->val, Prop->len );
 
 	free( Prop->val );
 	Prop->val = NULL;
@@ -1807,13 +1690,7 @@ static int retrieveStrongReferenceSet( AAF_Data *aafd, aafProperty *Prop, aafObj
 {
 	wchar_t refName[CFB_NODE_NAME_SZ];
 
-	// utf16toa( refName, CFB_NODE_NAME_SZ, Prop->val, Prop->len );
-
-#ifdef _WIN32
-	memcpy( refName, Prop->val, Prop->len );
-#else
-	w16tow32( refName, Prop->val, Prop->len );
-#endif
+  cfb_w16towchar( refName, Prop->val, Prop->len );
 
 	free( Prop->val );
 	Prop->val = NULL;
@@ -1897,13 +1774,7 @@ static int retrieveStrongReferenceVector( AAF_Data *aafd, aafProperty *Prop, aaf
 {
 	wchar_t refName[CFB_NODE_NAME_SZ];
 
-	// utf16toa( refName, CFB_NODE_NAME_SZ, Prop->val, Prop->len );
-
-#ifdef _WIN32
-	memcpy( refName, Prop->val, Prop->len );
-#else
-	w16tow32( refName, Prop->val, Prop->len );
-#endif
+  cfb_w16towchar( refName, Prop->val, Prop->len );
 
 	free( Prop->val );
 	Prop->val = NULL;
@@ -2211,13 +2082,7 @@ static aafStrongRefSetHeader_t * getStrongRefSetList( AAF_Data *aafd, cfbNode *N
 	{
 		wchar_t refName[CFB_NODE_NAME_SZ];
 
-		// utf16toa( refName, CFB_NODE_NAME_SZ, Node->_ab, Node->_cb );
-
-#ifdef _WIN32
-		memcpy( refName, Node->_ab, Node->_cb );
-#else
-		w16tow32( refName, Node->_ab, Node->_cb );
-#endif
+    cfb_w16towchar( refName, Node->_ab, Node->_cb );
 
 		error( "Could not retrieve StrongReferenceSet Index Stream @ \"%ls/%ls index\".", aaf_get_ObjectPath( Parent ), refName );
 
@@ -2242,12 +2107,11 @@ static aafStrongRefVectorHeader_t * getStrongRefVectorList( AAF_Data *aafd, cfbN
 
 	if ( stream == NULL )
 	{
-		char refName[CFB_NODE_NAME_SZ];
+		wchar_t refName[CFB_NODE_NAME_SZ];
 
-		utf16toa( refName, CFB_NODE_NAME_SZ, Node->_ab, Node->_cb );
+    cfb_w16towchar( refName, Node->_ab, Node->_cb );
 
-		error( "Could not retrieve StrongReferenceVector Index Stream \"%ls/%s index\"", aaf_get_ObjectPath( Parent ), refName );
-
+    error( "Could not retrieve StrongReferenceVector Index Stream \"%ls/%ls index\"", aaf_get_ObjectPath( Parent ), refName );
 		return NULL;
 	}
 

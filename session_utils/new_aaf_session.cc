@@ -659,7 +659,7 @@ static void set_region_fade( aafiAudioClip *aafAudioClip, std::shared_ptr<Region
 
 static void set_session_timecode( Session *s, AAF_Iface *aafi )
 {
-  uint16_t aaftc2 = aafi->Audio->tc->fps;
+  uint16_t aaftc2 = aafi->Timecode->fps;
   // aafRational_t *aaftc1 = ( aafi->Video ) ? ( aafi->Video->Essences ) ? aafi->Video->Essences->framerate : NULL : NULL;
   TimecodeFormat ardourtc;
 
@@ -739,8 +739,8 @@ static void set_session_timecode( Session *s, AAF_Iface *aafi )
     switch ( aaftc2 ) {
 
       case 24:
-        if ( aafi->Audio->tc->edit_rate->numerator   == 24000 &&
-             aafi->Audio->tc->edit_rate->denominator == 1001 )
+        if ( aafi->Timecode->edit_rate->numerator   == 24000 &&
+             aafi->Timecode->edit_rate->denominator == 1001 )
         {
           ardourtc = timecode_23976;
         }
@@ -750,8 +750,8 @@ static void set_session_timecode( Session *s, AAF_Iface *aafi )
         break;
 
       case 25:
-        if ( aafi->Audio->tc->edit_rate->numerator   == 25000 &&
-             aafi->Audio->tc->edit_rate->denominator == 1001 )
+        if ( aafi->Timecode->edit_rate->numerator   == 25000 &&
+             aafi->Timecode->edit_rate->denominator == 1001 )
         {
           ardourtc = timecode_24976;
         }
@@ -761,10 +761,10 @@ static void set_session_timecode( Session *s, AAF_Iface *aafi )
         break;
 
       case 30:
-        if ( aafi->Audio->tc->edit_rate->numerator   == 30000 &&
-             aafi->Audio->tc->edit_rate->denominator == 1001 )
+        if ( aafi->Timecode->edit_rate->numerator   == 30000 &&
+             aafi->Timecode->edit_rate->denominator == 1001 )
         {
-          if ( aafi->Audio->tc->drop ) {
+          if ( aafi->Timecode->drop ) {
             ardourtc = timecode_2997drop;
           }
           else {
@@ -772,7 +772,7 @@ static void set_session_timecode( Session *s, AAF_Iface *aafi )
           }
         }
         else {
-          if ( aafi->Audio->tc->drop ) {
+          if ( aafi->Timecode->drop ) {
             ardourtc = timecode_30drop;
           }
           else {
@@ -782,8 +782,8 @@ static void set_session_timecode( Session *s, AAF_Iface *aafi )
         break;
 
       case 60:
-        if ( aafi->Audio->tc->edit_rate->numerator   == 60000 &&
-             aafi->Audio->tc->edit_rate->denominator == 1001 )
+        if ( aafi->Timecode->edit_rate->numerator   == 60000 &&
+             aafi->Timecode->edit_rate->denominator == 1001 )
         {
           ardourtc = timecode_5994;
         }
@@ -1331,7 +1331,7 @@ int main( int argc, char* argv[] )
         aafAudioClip->Essence->unique_file_name,
         (( aafAudioClip->gain && aafAudioClip->gain->flags & AAFI_AUDIO_GAIN_CONSTANT ) ? 20 * log10( aafRationalToFloat( aafAudioClip->gain->value[0] ) ) : 0),
         aafAudioClip->track->number,
-        timecode_format_sampletime( (clipPos + sessionStart), samplerate, aafAudioClip->track->Audio->tc->fps, false ).c_str()
+        timecode_format_sampletime( (clipPos + sessionStart), samplerate, aafi->Timecode->fps, false ).c_str()
       );
 
 
