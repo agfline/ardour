@@ -926,6 +926,7 @@ void clear_cache( AAF_Iface *aafi, string media_cache_path )
 }
 
 
+
 int main( int argc, char* argv[] )
 {
   setlocale( LC_ALL, "" );
@@ -1098,7 +1099,16 @@ int main( int argc, char* argv[] )
   aafi->ctx.options.trace = 1;
   aafi->ctx.options.resolve = aaf_resolve_options;
   aafi->ctx.options.protools = aaf_protools_options;
-  // aafi->ctx.options.media_location = (media_location_path.empty()) ? NULL : strdup( media_location_path.c_str() );
+  
+  /*
+   * The following "forbid_nonlatin_filenames" option is there until we find a
+   * solution to avoid issue with e.g korean filenames :
+   *
+   * [e] ../session_utils/new_aaf_session.cc : main() on line 1279 : Could not import '샘플 단위 정밀 편집_2' to session.
+   * : [ERROR]: FFMPEGFileImportableSource: Failed to read file metadata
+   * : [ERROR]: Import: cannot open input sound file "/tmp/pt-ko/Ø
+   */
+  aafi->ctx.options.forbid_nonlatin_filenames = 1;
 
   if ( !media_location_path.empty() ) {
     aafi_set_media_location( aafi, media_location_path.c_str() );
