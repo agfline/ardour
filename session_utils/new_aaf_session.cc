@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2023 Adrien Gesta-Fline <dev.agfline@posteo.net>
  * Based on Robin Gareus <robin@gareus.org> session_utils files
+ * Based on Damien Zammit ptformat
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1099,7 +1100,7 @@ int main( int argc, char* argv[] )
   aafi->ctx.options.trace = 1;
   aafi->ctx.options.resolve = aaf_resolve_options;
   aafi->ctx.options.protools = aaf_protools_options;
-  
+
   /*
    * The following "forbid_nonlatin_filenames" option is there until we find a
    * solution to avoid issue with e.g korean filenames :
