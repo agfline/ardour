@@ -101,7 +101,7 @@ static void set_session_range( Session *s, AAF_Iface *aafi );
 static std::shared_ptr<Region> create_region( vector<std::shared_ptr<Region> > source_regions, aafiAudioClip *aafAudioClip, SourceList& oneClipSources, aafPosition_t clipOffset, aafRational_t samplerate_r );
 static void set_region_gain( aafiAudioClip *aafAudioClip, std::shared_ptr<Region> region, Session *s );
 static std::shared_ptr<AudioTrack> prepare_audio_track( aafiAudioTrack *aafTrack, Session *s );
-static void set_region_fade( aafiAudioClip *aafAudioClip, std::shared_ptr<Region> region );
+static void set_region_fade( aafiAudioClip *aafAudioClip, std::shared_ptr<Region> region, aafRational_t *samplerate );
 static void set_session_timecode( Session *s, AAF_Iface *aafi );
 
 
@@ -600,11 +600,9 @@ static std::shared_ptr<AudioTrack> prepare_audio_track( aafiAudioTrack *aafTrack
 
 
 
-static void set_region_fade( aafiAudioClip *aafAudioClip, std::shared_ptr<Region> region )
+static FadeShape aaf_fade_interpol_to_ardour_fade_shape( aafiInterpolation_e interpol )
 {
-  /* Set fades if any
-   * ================
-   *
+  /*
    * https://github.com/Ardour/ardour/blob/b84c99639f0dd28e210ed9c064429c17014093a7/libs/ardour/ardour/types.h#L705
    *
    * enum FadeShape {
@@ -619,38 +617,73 @@ static void set_region_fade( aafiAudioClip *aafAudioClip, std::shared_ptr<Region
    * https://github.com/Ardour/ardour/blob/365f6d633731229e7bc5d37a5fe2c9107b527e28/libs/temporal/temporal/types.h#L39
    */
 
+  switch ( interpol & AAFI_INTERPOL_MASK ) {
+
+    case AAFI_INTERPOL_NONE:
+      PRINT_W( "Fade type is set to AAFI_INTERPOL_NONE : Falling back to FadeConstantPower." );
+      return FadeConstantPower;
+
+    case AAFI_INTERPOL_LINEAR:
+      return FadeLinear;
+
+    case AAFI_INTERPOL_LOG:
+      PRINT_W( "Fade type is set to AAFI_INTERPOL_LOG : Falling back to FadeConstantPower." );
+      return FadeConstantPower;
+
+    case AAFI_INTERPOL_CONSTANT:
+      PRINT_W( "Fade type is set to AAFI_INTERPOL_CONSTANT : Falling back to FadeConstantPower." );
+      return FadeConstantPower;
+
+    case AAFI_INTERPOL_POWER:
+      return FadeConstantPower;
+
+    case AAFI_INTERPOL_BSPLINE:
+      PRINT_W( "Fade type is set to AAFI_INTERPOL_BSPLINE : Falling back to FadeConstantPower." );
+      return FadeConstantPower;
+
+    default:
+      PRINT_W( "Unknown fade type : Falling back to FadeConstantPower." );
+      return FadeConstantPower;
+  }
+
+  PRINT_W( "Unknown fade type : Falling back to FadeConstantPower." );
+  return FadeConstantPower;
+}
+
+
+
+static void set_region_fade( aafiAudioClip *aafAudioClip, std::shared_ptr<Region> region, aafRational_t *samplerate )
+{
+  if ( aafAudioClip == NULL ) {
+    return;
+  }
+
   aafiTransition *fadein  = get_fadein( aafAudioClip->Item );
   aafiTransition *fadeout = get_fadeout( aafAudioClip->Item );
+  aafiTransition *xfade   = get_xfade( aafAudioClip->Item );
 
-  if ( fadein == NULL ) {
-    fadein = get_xfade( aafAudioClip->Item );
+  if ( xfade ) {
+    if ( fadein == NULL ) {
+      fadein = xfade;
+    }
+    else {
+      PRINT_W( "Clip has both fadein and crossfade : crossfade will be ignored." );
+    }
   }
 
   FadeShape fade_shape;
   samplecnt_t fade_len;
 
   if ( fadein != NULL ) {
-    fade_shape = (fadein->flags & AAFI_INTERPOL_NONE)     ? FadeLinear :
-                 (fadein->flags & AAFI_INTERPOL_LINEAR)   ? FadeLinear :
-                 (fadein->flags & AAFI_INTERPOL_LOG)      ? FadeSymmetric :
-                 (fadein->flags & AAFI_INTERPOL_CONSTANT) ? FadeConstantPower :
-                 (fadein->flags & AAFI_INTERPOL_POWER)    ? FadeConstantPower :
-                 (fadein->flags & AAFI_INTERPOL_BSPLINE)  ? FadeLinear :
-                 FadeLinear;
-    fade_len = eu2sample_fromclip( aafAudioClip, fadein->len );
+    fade_shape = aaf_fade_interpol_to_ardour_fade_shape( (aafiInterpolation_e)(fadein->flags & AAFI_INTERPOL_MASK) );
+    fade_len = convertEditUnit( fadein->len, *aafAudioClip->track->edit_rate, *samplerate );
 
     std::dynamic_pointer_cast<AudioRegion>(region)->set_fade_in( fade_shape, fade_len );
   }
 
   if ( fadeout != NULL ) {
-    fade_shape = (fadeout->flags & AAFI_INTERPOL_NONE)     ? FadeLinear :
-                 (fadeout->flags & AAFI_INTERPOL_LINEAR)   ? FadeLinear :
-                 (fadeout->flags & AAFI_INTERPOL_LOG)      ? FadeSymmetric :
-                 (fadeout->flags & AAFI_INTERPOL_CONSTANT) ? FadeConstantPower :
-                 (fadeout->flags & AAFI_INTERPOL_POWER)    ? FadeConstantPower :
-                 (fadeout->flags & AAFI_INTERPOL_BSPLINE)  ? FadeLinear :
-                 FadeLinear;
-    fade_len = eu2sample_fromclip( aafAudioClip, fadeout->len );
+    fade_shape = aaf_fade_interpol_to_ardour_fade_shape( (aafiInterpolation_e)(fadeout->flags & AAFI_INTERPOL_MASK) );
+    fade_len = convertEditUnit( fadeout->len, *aafAudioClip->track->edit_rate, *samplerate );
 
     std::dynamic_pointer_cast<AudioRegion>(region)->set_fade_out( fade_shape, fade_len );
   }
@@ -1379,7 +1412,7 @@ int main( int argc, char* argv[] )
       set_region_gain( aafAudioClip, region, s );
 
 
-      set_region_fade( aafAudioClip, region );
+      set_region_fade( aafAudioClip, region, &samplerate_r );
 
 
       if ( aafAudioClip->mute ) {
