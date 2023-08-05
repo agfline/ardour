@@ -59,7 +59,7 @@ using namespace PBD;
 
 
 #ifndef UTILNAME
-#define UTILNAME "ardour_aafimport"
+#define UTILNAME "new_aaf_session"
 #endif
 
 
