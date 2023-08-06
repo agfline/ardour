@@ -76,6 +76,7 @@ using namespace PBD;
  *    - Multichannel region from multiple source audio files (1 file per channel) ?
  *    - Mono region from a specific channel of a multichannel file ?
  *    x Muted region
+ *    - Video file import
  */
 
 
@@ -208,15 +209,15 @@ static Session* create_new_session( string const &dir, string const &state, floa
 
 	string s = Glib::build_filename( dir, state + statefile_suffix );
 
-	// if ( Glib::file_test( dir, Glib::FILE_TEST_EXISTS ) ) {
-	// 	PRINT_E( "Session folder already exists '%s'\n", dir.c_str() );
-	// 	return NULL;
-	// }
-  //
-	// if ( Glib::file_test( s, Glib::FILE_TEST_EXISTS ) ) {
-	// 	PRINT_E( "Session file exists '%s'\n", s.c_str() );
-	// 	return NULL;
-	// }
+	if ( Glib::file_test( dir, Glib::FILE_TEST_EXISTS ) ) {
+		PRINT_E( "Session folder already exists '%s'\n", dir.c_str() );
+		return NULL;
+	}
+
+	if ( Glib::file_test( s, Glib::FILE_TEST_EXISTS ) ) {
+		PRINT_E( "Session file exists '%s'\n", s.c_str() );
+		return NULL;
+	}
 
 	BusProfile  bus_profile;
 	BusProfile *bus_profile_ptr = NULL;
@@ -242,100 +243,6 @@ static Session* create_new_session( string const &dir, string const &state, floa
 
 
 
-// static void set_session_video_from_aaf( Session *s, AAF_Iface *aafi )
-// {
-//   if ( aafi->Video->Tracks && aafi->Video->Tracks->Items ) {
-//
-// 		aafiVideoClip *videoClip = (aafiVideoClip*)&aafi->Video->Tracks->Items->data;
-//
-// 		// printf( "\n\n\nGot video Track and Item : %ls\n\n\n", videoClip->Essence->original_file_path/*->Essence->original_file_path*/ );
-//     // char origf[PATH_MAX+1];
-//     // snprintf(origf, PATH_MAX, "%ls", videoClip->Essence->original_file_path ); // TODOPATH
-//     // printf("Looking for : %s\n", strrchr(origf, '/') + 1 );
-//
-// 		char *file = locate_external_essence_file( aafi, videoClip->Essence->original_file_path, NULL );
-//
-// 		if ( file != NULL ) {
-//       PRINT_I( "Importing video : %s\n", Glib::path_get_basename(string(file)).c_str()/*fop_get_filename(file)*/ );
-//
-// 			/* get absolute video file path */
-// 			std::string absFile (PBD::canonical_path (file));
-//
-// 			// /* get original mxf video filename */
-// 			// char *file_name = remove_file_ext( basename(file), '.', '/' );
-// 			//
-// 			// /* creates project video folder */
-// 			// mkdir( s->session_directory().video_path().c_str(), 0755 );
-// 			//
-// 			// /* extract mpeg video from original mxf */
-// 			// char cmdstr[PATH_MAX*6];
-// 			// snprintf( cmdstr, sizeof(cmdstr), "ffmpeg -y -i \"%s\" -c copy -f mpeg2video \"%s/%s.mpg\"", absFile, s->session_directory().video_path().c_str(), file_name );
-// 			// //snprintf( cmdstr, sizeof(cmdstr), "ffmpeg -y -i \"%s\" -c copy -map_metadata 0 \"%s/%s.mkv\"", absFile, s->session_directory().video_path().c_str(), file_name );
-// 			//
-// 			// system(cmdstr);
-//
-//
-// 			/* Add video to Ardour
-// 			 * ===================
-// 			 * https://github.com/Ardour/ardour/blob/6987196ea18cbf171e22ed62760962576ccb54da/gtk2_ardour/ardour_ui_video.cc#L317
-// 			 *
-// 			 *	<Videotimeline Filename="/home/agfline/Developpement/ardio/watchfolder/3572607_RUGBY_F2_S65CFA3D0V.mxf" AutoFPS="1" LocalFile="1" OriginalVideoFile="/home/agfline/Developpement/ardio/watchfolder/3572607_RUGBY_F2_S65CFA3D0V.mxf"/>
-//             <RulerVisibility timecode="1" bbt="1" samples="0" minsec="0" tempo="1" meter="1" marker="1" rangemarker="1" transportmarker="1" cdmarker="1" videotl="1"/>
-// 			 */
-//
-// 			XMLNode* videoTLnode = new XMLNode( "Videotimeline" );
-// 			videoTLnode->set_property( "Filename", absFile/*string(file_name) + ".mpg"*/ );
-// 			videoTLnode->set_property( "AutoFPS", true );
-// 			videoTLnode->set_property( "LocalFile", true );
-// 			videoTLnode->set_property( "OriginalVideoFile", string(absFile) );
-// 			videoTLnode->set_property( "id", 51 );
-// 			videoTLnode->set_property( "Height", 3 );
-// 			videoTLnode->set_property( "VideoOffsetLock", true );
-// 			videoTLnode->set_property( "VideoOffset", eu2sample( s->sample_rate(), videoClip->track->Video->tc->edit_rate, (videoClip->pos + videoClip->track->Video->tc->start)) );
-//
-//       // printf("\n\n\n%li  |  %li\n\n\n", videoClip->pos, videoClip->track->Video->tc->start );
-//
-// 			XMLNode* videoMONnode = new XMLNode( "Videomonitor" );
-// 			videoMONnode->set_property( "active", true );
-//
-//
-//
-// 			XMLNode* xjnode = new XMLNode( "XJSettings" );
-//
-//       XMLNode* xjsetting;
-//       xjsetting = xjnode->add_child( "XJSetting" );
-//       xjsetting->set_property( "k", "set offset" );
-//       xjsetting->set_property( "v", "-90000" ); //videoClip->pos * videoClip->track->Video->tc->edit_rate );
-//
-//       xjsetting = xjnode->add_child( "XJSetting" );
-//       xjsetting->set_property( "k", "osd smpte" );
-//       xjsetting->set_property( "v", "95" );
-//
-//       /* video_monitor.cc
-//       <XJSettings>
-//         <XJSetting k="window fullscreen" v="on"/>
-//         <XJSetting k="set offset" v="-90000"/>
-//         <XJSetting k="osd smpte" v="95"/>
-//       </XJSettings>
-//       */
-//
-// 			s->add_extra_xml(*xjnode);
-// 			s->add_extra_xml(*videoTLnode);
-// 			s->add_extra_xml(*videoMONnode);
-//
-// 			// s->set_dirty();
-// 		}
-//     else {
-//       PRINT_E( "Could not locate video file : %ls\n", videoClip->Essence->original_file_path );
-//     }
-// 	}
-//   else {
-//     PRINT_E( "Could not retrieve video from AAF.\n" );
-//   }
-// }
-
-
-
 /*
  * libs/ardour/import.cc
  * - Reimplement since function was removed in 4620d13 : https://github.com/Ardour/ardour/commit/4620d138eefad57bc55e1901d8410c36803ce0d6 -
@@ -343,7 +250,7 @@ static Session* create_new_session( string const &dir, string const &state, floa
 
 static std::shared_ptr<AudioTrack> get_nth_audio_track( uint32_t nth, std::shared_ptr<RouteList const> routes )
 {
-	RouteList rl = *(routes);//(*(routes.reader ()));
+	RouteList rl = *(routes);
 	rl.sort( Stripable::Sorter() );
 
 	for ( auto const& r: rl ) {
@@ -360,18 +267,20 @@ static std::shared_ptr<AudioTrack> get_nth_audio_track( uint32_t nth, std::share
 
 
 
+/*
+ * https://github.com/Ardour/ardour/blob/365f6d633731229e7bc5d37a5fe2c9107b527e28/libs/ardour/import_pt.cc#L82
+ */
+
 static bool import_sndfile_as_region( Session *s, struct aafiAudioEssence *audioEssence, SrcQuality quality, timepos_t &pos, SourceList &sources, ImportStatus &status, vector<std::shared_ptr<Region> > *regions /* boost::shared_ptr<Region> r*/ )
 {
-  /* https://github.com/Ardour/ardour/blob/365f6d633731229e7bc5d37a5fe2c9107b527e28/libs/ardour/import_pt.cc#L82 */
-
   wstring ws(audioEssence->usable_file_path);
   string usable_file_path(ws.begin(), ws.end());
 
   /* Import the source */
   status.paths.clear();
-  status.paths.push_back( usable_file_path /*path*/);
-  status.current = 1; // TODO
-  status.total = 1; // TODO
+  status.paths.push_back( usable_file_path );
+  status.current = 1;
+  status.total = 1;
   status.freeze = false;
   status.quality = quality;
   status.replace_existing_source = false;
@@ -433,9 +342,9 @@ static bool import_sndfile_as_region( Session *s, struct aafiAudioEssence *audio
 
   PropertyList proplist;
 
-  proplist.add (ARDOUR::Properties::start,  0 /*eu2sample_fromclip( clip, clip->essence_offset )*/);
+  proplist.add (ARDOUR::Properties::start,  0 );
   proplist.add (ARDOUR::Properties::length, timecnt_t( sources[0]->length(), pos ));
-  proplist.add (ARDOUR::Properties::name, unique_file_name/*region_name*/);
+  proplist.add (ARDOUR::Properties::name, unique_file_name );
   proplist.add (ARDOUR::Properties::layer, 0);
   proplist.add (ARDOUR::Properties::whole_file, true);
   proplist.add (ARDOUR::Properties::external, true);
@@ -446,7 +355,7 @@ static bool import_sndfile_as_region( Session *s, struct aafiAudioEssence *audio
 
 
 
-  /* NOTE Don't know what that's for */
+  /* NOTE: Don't know what that's for */
 
   // bool use_timestamp;
   // use_timestamp = (pos == -1);
@@ -559,7 +468,7 @@ static void set_region_gain( aafiAudioClip *aafAudioClip, std::shared_ptr<Region
     std::shared_ptr<AutomationList> al = ar->envelope();
 
     for ( int i = 0; i < level->pts_cnt; i++ ) {
-      al->fast_simple_add( timepos_t( aafRationalToFloat( level->time[i] ) * region->length().samples()/*s->sample_rate()*/ ), aafRationalToFloat( level->value[i] ) );
+      al->fast_simple_add( timepos_t( aafRationalToFloat( level->time[i] ) * region->length().samples() ), aafRationalToFloat( level->value[i] ) );
   	}
   }
 }
@@ -568,8 +477,7 @@ static void set_region_gain( aafiAudioClip *aafAudioClip, std::shared_ptr<Region
 
 static std::shared_ptr<AudioTrack> prepare_audio_track( aafiAudioTrack *aafTrack, Session *s )
 {
-  /* Add region to track
-   * ===================
+  /*
    * https://github.com/Ardour/ardour/blob/365f6d633731229e7bc5d37a5fe2c9107b527e28/libs/ardour/import_pt.cc#L327
    */
 
@@ -693,165 +601,79 @@ static void set_region_fade( aafiAudioClip *aafAudioClip, std::shared_ptr<Region
 
 static void set_session_timecode( Session *s, AAF_Iface *aafi )
 {
-  uint16_t aaftc2 = aafi->Timecode->fps;
-  // aafRational_t *aaftc1 = ( aafi->Video ) ? ( aafi->Video->Essences ) ? aafi->Video->Essences->framerate : NULL : NULL;
+  uint16_t aafFPS = aafi->Timecode->fps;
   TimecodeFormat ardourtc;
 
   /*
-   *  The following is based on adobe premiere pro's AAF.
    *  Fractional timecodes are never explicitly set into tc->fps, so we deduce
    *  them based on edit_rate value.
-   *
-   *  Available timecodes in ardour (libs/ardour/enums.cc) :
-   *
-   *    	REGISTER_ENUM (timecode_23976);
-   *     	REGISTER_ENUM (timecode_24);
-   *    	REGISTER_ENUM (timecode_24976);
-   *    	REGISTER_ENUM (timecode_25);
-   *    	REGISTER_ENUM (timecode_2997);
-   *    	REGISTER_ENUM (timecode_2997drop);
-   *    	REGISTER_ENUM (timecode_30);
-   *    	REGISTER_ENUM (timecode_30drop);
-   *    	REGISTER_ENUM (timecode_5994);
-   *   	  REGISTER_ENUM (timecode_60);
-   *
-   *
-   *  TODO: Why should we set TC based on aafi->Video->Essences->framerate ?
-   *  Disable until we found a good reason.
    */
 
-  // if ( aaftc1 ) {
-  //
-  //   if ( aaftc1->numerator   == 24000 &&
-  //        aaftc1->denominator ==  1001 )
-  //   {
-  //     ardourtc = timecode_23976;
-  //   }
-  //   else
-  //   if ( aaftc1->numerator   == 24 &&
-  //        aaftc1->denominator ==  1 )
-  //   {
-  //     ardourtc = timecode_24;
-  //   }
-  //   else
-  //   if ( aaftc1->numerator   == 25 &&
-  //        aaftc1->denominator ==  1 )
-  //   {
-  //     ardourtc = timecode_25;
-  //   }
-  //   else
-  //   if ( aaftc1->numerator   == 29000 &&
-  //        aaftc1->denominator ==  1001 )
-  //   {
-  //     ardourtc = timecode_2997;
-  //   }
-  //   else
-  //   if ( aaftc1->numerator   == 30 &&
-  //        aaftc1->denominator ==  1 )
-  //   {
-  //     ardourtc = timecode_30;
-  //   }
-  //   else
-  //   if ( aaftc1->numerator   == 59000 &&
-  //        aaftc1->denominator ==  1001 )
-  //   {
-  //     ardourtc = timecode_5994;
-  //   }
-  //   else
-  //   if ( aaftc1->numerator   == 60 &&
-  //        aaftc1->denominator ==  1 )
-  //   {
-  //     ardourtc = timecode_60;
-  //   }
-  //   else {
-  //     PRINT_E( "Unknown AAF timecode fps : %i/%i.\n", aaftc1->numerator, aaftc1->denominator );
-  //     return;
-  //   }
-  // }
-  // else {
+  switch ( aafFPS ) {
 
-    switch ( aaftc2 ) {
+    case 24:
+      if ( aafi->Timecode->edit_rate->numerator   == 24000 &&
+           aafi->Timecode->edit_rate->denominator == 1001 )
+      {
+        ardourtc = timecode_23976;
+      }
+      else {
+        ardourtc = timecode_24;
+      }
+      break;
 
-      case 24:
-        if ( aafi->Timecode->edit_rate->numerator   == 24000 &&
-             aafi->Timecode->edit_rate->denominator == 1001 )
-        {
-          ardourtc = timecode_23976;
+    case 25:
+      if ( aafi->Timecode->edit_rate->numerator   == 25000 &&
+           aafi->Timecode->edit_rate->denominator == 1001 )
+      {
+        ardourtc = timecode_24976;
+      }
+      else {
+        ardourtc = timecode_25;
+      }
+      break;
+
+    case 30:
+      if ( aafi->Timecode->edit_rate->numerator   == 30000 &&
+           aafi->Timecode->edit_rate->denominator == 1001 )
+      {
+        if ( aafi->Timecode->drop ) {
+          ardourtc = timecode_2997drop;
         }
         else {
-          ardourtc = timecode_24;
+          ardourtc = timecode_2997;
         }
-        break;
-
-      case 25:
-        if ( aafi->Timecode->edit_rate->numerator   == 25000 &&
-             aafi->Timecode->edit_rate->denominator == 1001 )
-        {
-          ardourtc = timecode_24976;
+      }
+      else {
+        if ( aafi->Timecode->drop ) {
+          ardourtc = timecode_30drop;
         }
         else {
-          ardourtc = timecode_25;
+          ardourtc = timecode_30;
         }
-        break;
+      }
+      break;
 
-      case 30:
-        if ( aafi->Timecode->edit_rate->numerator   == 30000 &&
-             aafi->Timecode->edit_rate->denominator == 1001 )
-        {
-          if ( aafi->Timecode->drop ) {
-            ardourtc = timecode_2997drop;
-          }
-          else {
-            ardourtc = timecode_2997;
-          }
-        }
-        else {
-          if ( aafi->Timecode->drop ) {
-            ardourtc = timecode_30drop;
-          }
-          else {
-            ardourtc = timecode_30;
-          }
-        }
-        break;
-
-      case 60:
-        if ( aafi->Timecode->edit_rate->numerator   == 60000 &&
-             aafi->Timecode->edit_rate->denominator == 1001 )
-        {
-          ardourtc = timecode_5994;
-        }
-        else {
-          ardourtc = timecode_60;
-        }
-        break;
+    case 60:
+      if ( aafi->Timecode->edit_rate->numerator   == 60000 &&
+           aafi->Timecode->edit_rate->denominator == 1001 )
+      {
+        ardourtc = timecode_5994;
+      }
+      else {
+        ardourtc = timecode_60;
+      }
+      break;
 
 
-      default:
-        PRINT_E( "Unknown AAF timecode fps : %i.\n", aaftc2 );
-        return;
-    }
-  // }
+    default:
+      PRINT_E( "Unknown AAF timecode fps : %i.\n", aafFPS );
+      return;
+  }
 
   s->config.set_timecode_format( ardourtc );
 }
 
-
-
-
-
-
-#ifdef _WIN32
-  #include <io.h>
-  // #define access _access_s
-  // #define DIR_SEP '\\'
-  // #define DIR_SEP_STR "\\"
-#else
-  #include <paths.h>
-  // #include <unistd.h>
-  // #define DIR_SEP '/'
-  // #define DIR_SEP_STR "/"
-#endif
 
 
 int prepare_cache( AAF_Iface *aafi, string *media_cache_path ) {
@@ -872,28 +694,6 @@ int prepare_cache( AAF_Iface *aafi, string *media_cache_path ) {
     char *compoName = (char*)malloc( compoNameLen );
 
     wcstombs( compoName, aafi->compositionName, compoNameLen );
-
-    // /*
-    //  * sanitize dir name
-    //  * https://stackoverflow.com/a/31976060
-    //  */
-    // for ( int i = 0; i < (compoNameLen-1); i++ ) {
-    //   char c = compoName[i];
-    //   if ( c == '/' ||
-    //        c == '<' ||
-    //        c == '>' ||
-    //        c == ':' ||
-    //        c == '"' ||
-    //        c == '|' ||
-    //        c == '?' ||
-    //        c == '*' ||
-    //        c == '\\' ||
-    //        c < 0x30 ||
-    //        c > 0x7a )
-    //   {
-    //     compoName[i] = '_';
-    //   }
-    // }
 
     *media_cache_path = g_build_path( G_DIR_SEPARATOR_S, tmppath, clean_filename(compoName), NULL );
 
@@ -930,17 +730,11 @@ void clear_cache( AAF_Iface *aafi, string media_cache_path )
     if ( !audioEssence->is_embedded ) {
       continue;
     }
-// #ifdef _WIN32
-//     wchar_t *filepath = audioEssence->usable_file_path;
-// #else
+
     char *filepath = (char*)malloc( wcslen(audioEssence->usable_file_path) + 1 );
     snprintf( filepath, wcslen(audioEssence->usable_file_path) + 1, "%ls", audioEssence->usable_file_path );
-// #endif
 
-    // if ( access( filepath, 0 ) == 0 ) {
     if ( g_file_test( filepath, G_FILE_TEST_EXISTS ) ) {
-      // PRINT_W( "Would have removed from cache : %s\n", filepath );
-
       if ( remove( filepath ) < 0 ) {
         PRINT_E( "Failed to remove a file from cache (%s) : %s\n", filepath, strerror(errno) );
       }
@@ -949,9 +743,7 @@ void clear_cache( AAF_Iface *aafi, string media_cache_path )
       PRINT_E( "Missing a file from cache (%s) : %s\n", filepath, strerror(errno) );
     }
 
-#ifndef _WIN32
     free( filepath );
-#endif
   }
 
   if ( rmdir( media_cache_path.c_str() ) < 0 ) {
@@ -1129,20 +921,42 @@ int main( int argc, char* argv[] )
 
 	AAF_Iface *aafi = aafi_alloc( NULL );
 
-  aafi->ctx.options.verb = VERB_DEBUG;
   aafi->ctx.options.trace = 1;
   aafi->ctx.options.resolve = aaf_resolve_options;
   aafi->ctx.options.protools = aaf_protools_options;
 
   /*
    * The following "forbid_nonlatin_filenames" option is there until we find a
-   * solution to avoid issue with e.g korean filenames :
+   * solution to avoid issue with e.g korean filenames (e.g: pt-ko.aaf) :
    *
    * [e] ../session_utils/new_aaf_session.cc : main() on line 1279 : Could not import '샘플 단위 정밀 편집_2' to session.
    * : [ERROR]: FFMPEGFileImportableSource: Failed to read file metadata
    * : [ERROR]: Import: cannot open input sound file "/tmp/pt-ko/Ø
+   *
+   * NOTE: "Could not import '샘플 단위 정밀 편집_2' to session." prints korean chars well in console.
    */
   aafi->ctx.options.forbid_nonlatin_filenames = 1;
+
+
+  /*
+   * prepare libAAF log file.
+   * using a file pointer avoids the need to reimplement debug_callback()
+   */
+
+  string logfile = g_build_path( G_DIR_SEPARATOR_S, output_folder.c_str(), string(string(g_basename( aaf_file.c_str() )) + ".log").c_str(), NULL );
+
+  PRINT_I( "Writting AAF log to : %s\n", logfile.c_str() );
+
+  FILE *logfilefp = fopen( logfile.c_str(), "w" );
+
+  if ( logfilefp == NULL ) {
+    PRINT_E( "Could not open log file '%s'\n", logfile.c_str() );
+    ::exit( EXIT_FAILURE );
+  }
+
+  aafi_set_debug( aafi, VERB_DEBUG, logfilefp, NULL, NULL );
+
+
 
   if ( !media_location_path.empty() ) {
     aafi_set_media_location( aafi, media_location_path.c_str() );
@@ -1152,7 +966,6 @@ int main( int argc, char* argv[] )
 		PRINT_E( "Could not load AAF file.\n" );
 		::exit( EXIT_FAILURE );
 	}
-
 
   if ( prepare_cache( aafi, &media_cache_path ) ) {
     PRINT_E( "Could not prepare media cache path.\n" );
@@ -1242,13 +1055,8 @@ int main( int argc, char* argv[] )
   clean_filename( &session_name[0] );
 
   if ( Glib::file_test( string(output_folder + G_DIR_SEPARATOR + session_name), Glib::FILE_TEST_IS_DIR ) ) {
-    // if ( !replace_session_if_exists ) {
-  		PRINT_E( "Session folder already exists '%s'\n", string(output_folder + G_DIR_SEPARATOR + session_name).c_str() );
-  		::exit( EXIT_FAILURE );
-    // }
-    // else {
-    //   PRINT_I( "Overwriting existing Ardour session : %s \n", string(output_folder + G_DIR_SEPARATOR + session_name).c_str() );
-    // }
+		PRINT_E( "Session folder already exists '%s'\n", string(output_folder + G_DIR_SEPARATOR + session_name).c_str() );
+		::exit( EXIT_FAILURE );
 	}
 
 
@@ -1298,7 +1106,6 @@ int main( int argc, char* argv[] )
     /*
      *  If we extract embedded essences to `s->session_directory().sound_path()` then we end up with a duplicate on import.
      *  So we extract essence to a cache folder
-     *  TODO: clear cache
      */
 
 		if ( audioEssence->is_embedded ) {
@@ -1315,7 +1122,7 @@ int main( int argc, char* argv[] )
 
       if ( !audioEssence->usable_file_path ) {
         PRINT_E( "Could not locate external audio file : '%ls'\n", audioEssence->original_file_path );
-        continue;
+        continue; // TODO or fail ?
       }
     }
 
@@ -1445,27 +1252,12 @@ int main( int argc, char* argv[] )
   }
 
 
-
-  /*
-   *  Set Session Range
-   */
-
   set_session_range( s, aafi );
 
 
-
-  /*
-   *  Import Video from AAF
-   *  SegFault !
-   */
-
+  /* Import Video from AAF: SegFault ! */
 	// set_session_video_from_aaf( s, aafi );
 
-
-
-  /*
-   *  Import Video from AAF
-   */
 
   set_session_timecode( s, aafi );
 
@@ -1493,14 +1285,6 @@ int main( int argc, char* argv[] )
   }
 
 
-
-
-
-  /* NOTE: we need to build this before releasing session ! */
-  string session_file_path = s->session_directory().root_path() + G_DIR_SEPARATOR + session_name + string(".ardour");
-
-
-
 	SessionUtils::unload_session(s);
 	SessionUtils::cleanup();
 
@@ -1508,5 +1292,102 @@ int main( int argc, char* argv[] )
 	aafi_release( &aafi );
 
 
+  fclose( logfilefp );
+
+
 	return 0;
 }
+
+
+
+// static void set_session_video_from_aaf( Session *s, AAF_Iface *aafi )
+// {
+//   if ( aafi->Video->Tracks && aafi->Video->Tracks->Items ) {
+//
+// 		aafiVideoClip *videoClip = (aafiVideoClip*)&aafi->Video->Tracks->Items->data;
+//
+// 		// printf( "\n\n\nGot video Track and Item : %ls\n\n\n", videoClip->Essence->original_file_path/*->Essence->original_file_path*/ );
+//     // char origf[PATH_MAX+1];
+//     // snprintf(origf, PATH_MAX, "%ls", videoClip->Essence->original_file_path ); // TODOPATH
+//     // printf("Looking for : %s\n", strrchr(origf, '/') + 1 );
+//
+// 		char *file = locate_external_essence_file( aafi, videoClip->Essence->original_file_path, NULL );
+//
+// 		if ( file != NULL ) {
+//       PRINT_I( "Importing video : %s\n", Glib::path_get_basename(string(file)).c_str()/*fop_get_filename(file)*/ );
+//
+// 			/* get absolute video file path */
+// 			std::string absFile (PBD::canonical_path (file));
+//
+// 			// /* get original mxf video filename */
+// 			// char *file_name = remove_file_ext( basename(file), '.', '/' );
+// 			//
+// 			// /* creates project video folder */
+// 			// mkdir( s->session_directory().video_path().c_str(), 0755 );
+// 			//
+// 			// /* extract mpeg video from original mxf */
+// 			// char cmdstr[PATH_MAX*6];
+// 			// snprintf( cmdstr, sizeof(cmdstr), "ffmpeg -y -i \"%s\" -c copy -f mpeg2video \"%s/%s.mpg\"", absFile, s->session_directory().video_path().c_str(), file_name );
+// 			// //snprintf( cmdstr, sizeof(cmdstr), "ffmpeg -y -i \"%s\" -c copy -map_metadata 0 \"%s/%s.mkv\"", absFile, s->session_directory().video_path().c_str(), file_name );
+// 			//
+// 			// system(cmdstr);
+//
+//
+// 			/* Add video to Ardour
+// 			 * ===================
+// 			 * https://github.com/Ardour/ardour/blob/6987196ea18cbf171e22ed62760962576ccb54da/gtk2_ardour/ardour_ui_video.cc#L317
+// 			 *
+// 			 *	<Videotimeline Filename="/home/agfline/Developpement/ardio/watchfolder/3572607_RUGBY_F2_S65CFA3D0V.mxf" AutoFPS="1" LocalFile="1" OriginalVideoFile="/home/agfline/Developpement/ardio/watchfolder/3572607_RUGBY_F2_S65CFA3D0V.mxf"/>
+//             <RulerVisibility timecode="1" bbt="1" samples="0" minsec="0" tempo="1" meter="1" marker="1" rangemarker="1" transportmarker="1" cdmarker="1" videotl="1"/>
+// 			 */
+//
+// 			XMLNode* videoTLnode = new XMLNode( "Videotimeline" );
+// 			videoTLnode->set_property( "Filename", absFile/*string(file_name) + ".mpg"*/ );
+// 			videoTLnode->set_property( "AutoFPS", true );
+// 			videoTLnode->set_property( "LocalFile", true );
+// 			videoTLnode->set_property( "OriginalVideoFile", string(absFile) );
+// 			videoTLnode->set_property( "id", 51 );
+// 			videoTLnode->set_property( "Height", 3 );
+// 			videoTLnode->set_property( "VideoOffsetLock", true );
+// 			videoTLnode->set_property( "VideoOffset", eu2sample( s->sample_rate(), videoClip->track->Video->tc->edit_rate, (videoClip->pos + videoClip->track->Video->tc->start)) );
+//
+//       // printf("\n\n\n%li  |  %li\n\n\n", videoClip->pos, videoClip->track->Video->tc->start );
+//
+// 			XMLNode* videoMONnode = new XMLNode( "Videomonitor" );
+// 			videoMONnode->set_property( "active", true );
+//
+//
+//
+// 			XMLNode* xjnode = new XMLNode( "XJSettings" );
+//
+//       XMLNode* xjsetting;
+//       xjsetting = xjnode->add_child( "XJSetting" );
+//       xjsetting->set_property( "k", "set offset" );
+//       xjsetting->set_property( "v", "-90000" ); //videoClip->pos * videoClip->track->Video->tc->edit_rate );
+//
+//       xjsetting = xjnode->add_child( "XJSetting" );
+//       xjsetting->set_property( "k", "osd smpte" );
+//       xjsetting->set_property( "v", "95" );
+//
+//       /* video_monitor.cc
+//       <XJSettings>
+//         <XJSetting k="window fullscreen" v="on"/>
+//         <XJSetting k="set offset" v="-90000"/>
+//         <XJSetting k="osd smpte" v="95"/>
+//       </XJSettings>
+//       */
+//
+// 			s->add_extra_xml(*xjnode);
+// 			s->add_extra_xml(*videoTLnode);
+// 			s->add_extra_xml(*videoMONnode);
+//
+// 			// s->set_dirty();
+// 		}
+//     else {
+//       PRINT_E( "Could not locate video file : %ls\n", videoClip->Essence->original_file_path );
+//     }
+// 	}
+//   else {
+//     PRINT_E( "Could not retrieve video from AAF.\n" );
+//   }
+// }
