@@ -2,5 +2,5 @@
 /* Ardour build */
 #ifndef LIBAAF_VERSION_H_
 #define LIBAAF_VERSION_H_
-#define LIBAAF_VERSION "v0.1-65-g292c788"
+#define LIBAAF_VERSION "v0.1-66-g4353854"
 #endif  /* LIBAAF_VERSION_H_ */
