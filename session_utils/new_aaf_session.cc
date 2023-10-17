@@ -1102,7 +1102,7 @@ main (int argc, char* argv[])
 				continue;
 			}
 
-			aafAudioClip = (aafiAudioClip*)&aafAudioItem->data;
+			aafAudioClip = (aafiAudioClip*)aafAudioItem->data;
 
 			if (aafAudioClip->Essence == NULL) {
 				PRINT_E ("AAF clip has no essence\n");
