@@ -21,13 +21,9 @@
 #ifndef __AAFDump_h__
 #define __AAFDump_h__
 
-//
-// #include "aaf/AAFTypes.h"
 #include "aaf/AAFCore.h"
-// typedef struct AAF_Data AAF_Data;
-// typedef struct aafPropertyIndexHeader_t aafPropertyIndexHeader_t;
-// typedef struct aafObject aafObject;
-// typedef struct cfbNode cfbNode;
+#include "aaf/LibCFB.h"
+#include "aaf/AAFTypes.h"
 
 
 
@@ -35,14 +31,13 @@ void aaf_dump_Header( AAF_Data *aafd );
 
 void aaf_dump_Identification( AAF_Data *aafd );
 
-
-void aaf_dump_rawProperties( AAF_Data *aafd, aafPropertyIndexHeader_t *PropHeader );
+void aaf_dump_rawProperties( AAF_Data *aafd, aafByte_t *propStream );
 
 void aaf_dump_ObjectProperty( AAF_Data *aafd, aafProperty *Prop );
+
 void aaf_dump_ObjectProperties( AAF_Data *aafd, aafObject *Obj );
 
 void aaf_dump_nodeStreamProperties( AAF_Data *aafd, cfbNode *node );
-
 
 void aaf_dump_MetaDictionary( AAF_Data *aafd );
 
