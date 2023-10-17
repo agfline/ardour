@@ -41,7 +41,7 @@ if [ -z "${LOCAL_AAF_PROJECT}" ]; then
 	RSYNC_OPT="-auc --info=progress2"
 else
 
-	# Using pocal project
+	# Using local project
 
 	cd "${LOCAL_AAF_PROJECT}"
 	echo $PWD
