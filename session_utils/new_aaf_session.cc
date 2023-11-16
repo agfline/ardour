@@ -548,9 +548,9 @@ set_region_fade (aafiAudioClip* aafAudioClip, std::shared_ptr<Region> region, aa
 		return;
 	}
 
-	aafiTransition* fadein  = get_fadein (aafAudioClip->Item);
-	aafiTransition* fadeout = get_fadeout (aafAudioClip->Item);
-	aafiTransition* xfade   = get_xfade (aafAudioClip->Item);
+	aafiTransition* fadein  = aafi_get_fadein (aafAudioClip->Item);
+	aafiTransition* fadeout = aafi_get_fadeout (aafAudioClip->Item);
+	aafiTransition* xfade   = aafi_get_xfade (aafAudioClip->Item);
 
 	if (xfade) {
 		if (fadein == NULL) {
@@ -660,7 +660,7 @@ prepare_cache (AAF_Iface* aafi, string* media_cache_path)
 
 		wcstombs (compoName, aafi->compositionName, compoNameLen);
 
-		*media_cache_path = g_build_path (G_DIR_SEPARATOR_S, tmppath, clean_filename (compoName), NULL);
+		*media_cache_path = g_build_path (G_DIR_SEPARATOR_S, tmppath, laaf_util_clean_filename (compoName), NULL);
 
 		g_free (compoName);
 	}
@@ -1002,7 +1002,7 @@ main (int argc, char* argv[])
 		}
 	}
 
-	clean_filename (&session_name[0]);
+	laaf_util_clean_filename (&session_name[0]);
 
 	if (Glib::file_test (string (output_folder + G_DIR_SEPARATOR + session_name), Glib::FILE_TEST_IS_DIR)) {
 		PRINT_E ("Session folder already exists '%s'\n", string (output_folder + G_DIR_SEPARATOR + session_name).c_str ());
