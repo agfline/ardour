@@ -908,6 +908,8 @@ main (int argc, char* argv[])
 
 	aafi_set_debug (aafi, VERB_DEBUG, logfilefp, NULL, NULL);
 
+	aafi_enable_windows_VT100_output();
+
 	if (!media_location_path.empty ()) {
 		aafi_set_media_location (aafi, media_location_path.c_str ());
 	}
